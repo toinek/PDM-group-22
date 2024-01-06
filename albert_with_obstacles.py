@@ -115,8 +115,6 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
     for i in range(len(wall_obstacles)):
         env.add_obstacle(wall_obstacles[i])
 
-
-
     # defining an action
     action = np.zeros(env.n())
     action[0] = 0.2
@@ -135,7 +133,8 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
     )
 
     for _ in range(n_steps):
-        ob, *_ = env.step(action)
+        for _ in range(n_steps):
+            ob, *_ = env.step(action)
     env.close()
 
 

@@ -34,6 +34,11 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
 
     add_obstacles(env, [1.5, 0, 0], 0.5)
 
+    # print the obstacles within the environment
+    for obstacle in env.get_obstacles():
+        print(f"Obstacles in the environment: {env.get_obstacles()[obstacle].__dict__}")
+        print(f"Obstacle position: {(env.get_obstacles()[obstacle])._content_dict['geometry']}")
+
     action = np.zeros(env.n())
     action[0] = 1 # forward velocity
     action[1] = 0 # angular velocity
@@ -52,15 +57,13 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
         pos=np.array([0, 0, 0.0, 0.0, 0.0, 0.0, -1.5, 0.0, 1.8, 0.5])
     )
 
-
     #loop door de steps heen, voer een actie uit met env.step(action)
     for _ in range(n_steps):
         ob, *_ = env.step(action)
-        print(np.round(ob['robot_0']['joint_state']['position'], 1))
-        x = float(np.round(ob['robot_0']['joint_state']['position'], 1)[0])
-        y = float(np.round(ob['robot_0']['joint_state']['position'], 1)[1])
+        x = np.round(ob['robot_0']['joint_state']['position'], 1)[0]
+        y = np.round(ob['robot_0']['joint_state']['position'], 1)[1]
         angular = np.round(ob['robot_0']['joint_state']['position'], 1)[2]
-
+        print(f'Albert position: {x}, {y}, angle: {angular}')
     env.close()
 
 
