@@ -57,22 +57,32 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
         dt=0.01, robots=robots, render=render
     )
 
-    add_obstacles(env, [1.5, 0, 0], 0.5)
-    add_obstacles(env, [1.5, 2, 3], 0.5)
-    # print the obstacles within the environment
-    for obstacle in env.get_obstacles():
-        print(f"Obstacles in the environment: {env.get_obstacles()[obstacle].__dict__}")
-        print(f"Obstacle position: {(env.get_obstacles()[obstacle])._content_dict['geometry']}")
+    # initial position
+    ob = env.reset(
+        pos=np.array([0, 0, -0.5*np.pi, 0.0, 0.0, 0.0, -1.5, 0.0, 1.8, 0.5])
+    )
+    ob = ob[0]
 
-    bounds = {'xmin': 0, 'xmax': 7, 'ymin': 0, 'ymax': 7, 'zmin': 0, 'zmax': 2}
-    start = [0,0,0]
-    goal = [5,5,0]
-    obstacles = {i:(env.get_obstacles()[obstacle])._content_dict['geometry'] for i, obstacle in enumerate(env.get_obstacles())}
-    print(obstacles)
-    rrt_star_base = RRTStar(start, goal, bounds, obstacles, max_iter=100000)
+    # Add obstacles to the environment
+    boundary = 8
+    obstacle_adder = ObstacleAdder(env)
+    obstacle_adder.add_spheres()
+    obstacle_adder.add_walls(boundary)
+
+    # Algorithm inputs
+    bounds = {'xmin': -boundary/2, 'xmax': boundary/2, 'ymin': -boundary/2, 'ymax': boundary/2, 'zmin': 0, 'zmax': 3}
+    start_base = [0,0,0]
+    goal_base = [2,2,0]
+    obstacles = {i:(env.get_obstacles()[obstacle])._content_dict['geometry'] for i, obstacle in enumerate(env.get_obstacles()) if (env.get_obstacles()[obstacle])._content_dict['type'] == 'sphere'}
+
+    # Initialize and run algorithm
+    rrt_star_base = RRTStar(start_base, goal_base, bounds, obstacles, max_iter=100000)
     path_points = rrt_star_base.full_run()
 
+    # Extract positionts of the nodes
     path_points = [rrt_star_base.nodes[node].position for node in path_points]
+
+    # Visualize as test
     path_points.append([3,2,0])
     for point in path_points:
         rounded_points = np.round(point, 2).astype(float)
@@ -82,18 +92,9 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
             y = float(rounded_points[1])
             z = float(rounded_points[2])
             add_obstacles(env, [x,y,z+2], 0.1)
+
+    # Initialize action
     action = np.zeros(env.n())
-    action[0] = 0 # forward velocity
-    action[1] = 0 # angular velocity
-    action[2] = 0 # joint 1
-    action[3] = 0 # joint 2
-    action[4] = 0 # joint 3
-    action[5] = 0 # joint 4
-    action[6] = 0 # joint 5
-    action[7] = 0 # joint 6
-    action[8] = 0 # joint 7
-    action[9] = 0 # gripper -> snap deze nog niet helemaal
-    action[10] = 0 # gripper -> snap deze nog niet helemaal
 
     # initial position
     ob = env.reset(
