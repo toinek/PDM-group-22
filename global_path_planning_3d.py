@@ -1,7 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Line3D, Patch3D
 import plotly.graph_objects as go
 
 def euclidean_distance(q1, q2):
@@ -166,6 +163,13 @@ class RRTStar:
         collision = self.extend(self.nodes[q_near], q_rand)
         if not collision:
             self.rewire(len(self.nodes)-1)
+        # # Update the edges
+        # all_nodes = list(self.nodes.keys())[::-1]
+        # for node in all_nodes:
+        #     all_nodes.remove(node)
+        #     if self.nodes[node].parent != node:
+        #         if [self.nodes[node].parent, node] not in self.edges.values():
+        #             self.edges[len(self.edges)] = [self.nodes[node].parent, node]
         return q_rand
     def full_run(self):
         # Perform the RRT algorithm for max_iter iterations
