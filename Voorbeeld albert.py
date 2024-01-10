@@ -30,7 +30,15 @@ class PIDcontroller:
         error_diff = (error - self.error_prev) / dt
         self.error_prev = error
         return self.kp * error + self.ki * self.error_sum + self.kd * error_diff
-    
+
+def transform_to_local_coordinates(x, y, angle, target_x, target_y):
+    # transform the global coordinates to local coordinates
+    # x, y, angle = robot position and angle
+    # target_x, target_y = target position
+    # returns the local coordinates of the target
+    x_local = (target_x - x) * np.cos(angle) + (target_y - y) * np.sin(angle)
+    y_local = -(target_x - x) * np.sin(angle) + (target_y - y) * np.cos(angle)
+    return x_local, y_local
 
 def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
     robots = [
@@ -82,40 +90,47 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
         y = np.round(ob['robot_0']['joint_state']['position'], 1)[1]
         angular = np.round(ob['robot_0']['joint_state']['position'], 1)[2]
 
-        path_points = [(1.0, 1.0), (2.0, 1.0), (2.0, 2.0), (1.0, 2.0), (1.0, 1.0)]
+        path_points = [(3.0, 0.0), (3.0, -3.0), (0.0, 3.0), (0.0, 0.0)]
 
         # Use the pid controller to control the angular velocity to aim at the next point and drive towards it, not looping over every target all the time
         for target in path_points:
+            pid = PIDcontroller(0.5, 0.0, 0.001, 0.01)
             reached = False
             print("next target: ", target)
+
             while not reached:
                 x = np.round(ob['robot_0']['joint_state']['position'], 1)[0]
                 y = np.round(ob['robot_0']['joint_state']['position'], 1)[1]
                 angular = np.round(ob['robot_0']['joint_state']['position'], 1)[2]
         
-                pid = PIDcontroller(0.5, 0.0, 0.001, 0.01)
-                
-                error = np.arctan2(target[1] - y, target[0] - x) - angular
-                angular_vel = pid.update(error, 0.01)
+                # transform the local coordinates to global coordinates where the z axis should be rotated 90 degrees
+                x_local, y_local = transform_to_local_coordinates(x, y, angular, target[1], target[0])
+                print("local coordinates: ", x_local, y_local)
+                error = np.arctan2(y_local, x_local) + angular
+
+                print("error: ", error)
+
+                angular_vel = pid.update(error, 0.1)
                 action[1] = angular_vel
                 ob, *_ = env.step(action)
 
-                while error < 0.02:
+                while 0 < np.abs(error) < 0.02:
                     x = np.round(ob['robot_0']['joint_state']['position'], 1)[0]
                     y = np.round(ob['robot_0']['joint_state']['position'], 1)[1]
                     angular = np.round(ob['robot_0']['joint_state']['position'], 1)[2]
                     # print("test")
                     action[1] = 0
-                    action[0] = 0.5
+                    action[0] = 0.8
                     ob, *_ = env.step(action)
-
-                    # move to next target when previous target is reached within 0.1m, taking into account that coordinates can be negative
-                    if abs(target[0]) - abs(x) < 0.1 and abs(target[1]) - abs(y) < 0.2:
+                    print(np.sqrt((x - target[1])**2 + (y - target[0])**2))
+                    if np.sqrt((x - target[1])**2 + (y - target[0])**2) <= 0.3:
                         action[0] = 0
                         ob, *_ = env.step(action)
-                        print('target reached')
+                        print('----------------------------------------------\n target reached\n----------------------------------------------')
                         reached = True
                         break
+                    break
+                break
 
                 
 
