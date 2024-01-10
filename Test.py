@@ -59,6 +59,7 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
 
     add_obstacles(env, [1.5, 0, 0], 0.5)
     add_obstacles(env, [1.5, 2, 3], 0.5)
+    add_obstacles(env, [-0.046474914650907216, 0.4346157449998926, 0.34010572868276334], 0.05)
     # # print the obstacles within the environment
     # for obstacle in env.get_obstacles():
     #     print(f"Obstacles in the environment: {env.get_obstacles()[obstacle].__dict__}")
@@ -97,15 +98,26 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
 
     # initial position
     ob = env.reset(
-        pos=np.array([0, 0, -0.5*np.pi, 0.0, 0.0, 0.0, -1.5, 0.0, 1.8, 0.5])
+        pos=np.array([0, 0, -0.5*np.pi, 0.0, 0.0, 0.0, 0, 0.0, 0, 0])
     )
     ob = ob[0]
     #loop door de steps heen, voer een actie uit met env.step(action)
     for _ in range(n_steps):
         ob, *_ = env.step(action)
 
-        # get the robot joint angles 
-        print(ob['robot_0']['joint_state']['position'][3])
+        x_0 = np.round(ob['robot_0']['joint_state']['position'], 1)[0]
+        y_0 = np.round(ob['robot_0']['joint_state']['position'], 1)[1]
+        q1 = np.round(ob['robot_0']['joint_state']['position'], 1)[3] - np.pi/4
+        q2 = np.round(ob['robot_0']['joint_state']['position'], 1)[4]
+        q3 = np.round(ob['robot_0']['joint_state']['position'], 1)[5]
+        q4 = np.round(ob['robot_0']['joint_state']['position'], 1)[6]
+        q5 = np.round(ob['robot_0']['joint_state']['position'], 1)[7]
+        q6 = np.round(ob['robot_0']['joint_state']['position'], 1)[8]
+        q7 = np.round(ob['robot_0']['joint_state']['position'], 1)[9]
+
+        x,y,z = (get_endpoint_position(q1, q2, q3, q4, q5, q6, q7)[0] + x_0), (get_endpoint_position(q1, q2, q3, q4, q5, q6, q7)[1]+y_0), get_endpoint_position(q1, q2, q3, q4, q5, q6, q7)[2]
+        print(f'x: {x}, y: {y}, z: {z}')
+
         # x = np.round(ob['robot_0']['joint_state']['position'], 1)[0]
         # y = np.round(ob['robot_0']['joint_state']['position'], 1)[1]
         # z = np.round(ob['robot_0']['joint_state']['position'], 1)[2]
@@ -113,8 +125,8 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
         # print(f'x: {x}, y: {y}, z: {z}')
         # q_1_7 = inverse_kinematics(x, y, z)
         
-        action[0] = -0.3
-        action[3] = -0.5 # joint 1
+        # action[0] = -0.3
+        action[2] = 0.1 # joint 1
         ob, *_ = env.step(action)
         
 
@@ -122,6 +134,28 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
     env.close()
 
 from sympy import symbols, atan2, sqrt, cos, sin
+
+def get_endpoint_position(q1, q2, q3, q4, q5, q6, q7):
+    # forward kinematics
+    theta = [q1, q2, q3, q4, q5, q6, q7]
+
+    # DH parameters
+    d = [0.333, 0, 0.316, 0, 0.384, 0, 0]
+    a = [0, 0, 0, 0.0825, -0.0825, 0, 0.088]
+    alpha = [0, -np.pi/2, np.pi, np.pi/2, -np.pi/2, np.pi/2, np.pi/2]
+
+    # transformation matrices
+    T = np.zeros((4,4,7))
+    for i in range(7):
+        T[:,:,i] = np.array([[cos(theta[i]), -sin(theta[i])*cos(alpha[i]), sin(theta[i])*sin(alpha[i]), a[i]*cos(theta[i])],
+                            [sin(theta[i]), cos(theta[i])*cos(alpha[i]), -cos(theta[i])*sin(alpha[i]), a[i]*sin(theta[i])],
+                            [0, sin(alpha[i]), cos(alpha[i]), d[i]],
+                            [0, 0, 0, 1]])
+    
+    # end-effector position
+    end_effector_pos = np.dot(T[:,:,0], np.dot(T[:,:,1], np.dot(T[:,:,2], np.dot(T[:,:,3], np.dot(T[:,:,4], np.dot(T[:,:,5], T[:,:,6]))))))
+    return end_effector_pos[:3,3]
+
 
 def inverse_kinematics(x, y, z):
     # Define joint variables
@@ -173,6 +207,8 @@ def inverse_kinematics(x, y, z):
     q7_val = q7  # Use the original value from the DH table
 
     return q1_val, q2_val, q3_val, q4_val, q5_val, q6_val, q7_val
+
+
 
 
 if __name__ == "__main__":
