@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Line3D, Patch3D
+import plotly.graph_objects as go
 
 def euclidean_distance(q1, q2):
     # Compute the Euclidean distance between two points
@@ -19,7 +21,7 @@ class Node:
 
 
 class RRTStar:
-    def __init__(self, start, goal, bounds, obstacles, max_iter=1000):
+    def __init__(self, start, goal, bounds, obstacles, max_iter=100000):
         self.start = start
         self.goal = goal
         self.bounds = bounds
@@ -35,8 +37,8 @@ class RRTStar:
         # Return the sampled configuration
         in_collision = True
         while in_collision:
-            q_rand = np.random.uniform([self.bounds['xmin'], self.bounds['ymin']],
-                                       [self.bounds['xmax'], self.bounds['ymax']])
+            q_rand = np.random.uniform([self.bounds['xmin'], self.bounds['ymin'], self.bounds['zmin']],
+                                       [self.bounds['xmax'], self.bounds['ymax'], self.bounds['zmax']])
             in_collision = self.check_sample_in_obstacle(q_rand, 0.5)
         return q_rand
 
@@ -49,10 +51,11 @@ class RRTStar:
 
     def check_sample_in_obstacle(self, q_rand, epsilon):
         for obstacle in self.obstacles:
-            obstacle_position_2d = self.obstacles[obstacle]['position'][0], self.obstacles[obstacle]['position'][1]
-            distance = euclidean_distance(q_rand, obstacle_position_2d)
+            obstacle_position_3d = (self.obstacles[obstacle]['position'][0], self.obstacles[obstacle]['position'][1],
+                                    self.obstacles[obstacle]['position'][2])
+            distance = euclidean_distance(q_rand, obstacle_position_3d)
             if distance < self.obstacles[obstacle]['radius'] + epsilon:
-                #print("Sampled within obstacle")
+                print("Sampled within obstacle")
                 return True
         return False
 
@@ -69,27 +72,34 @@ class RRTStar:
         return nearest_neighbour
 
     def check_collision_in_path(self, q1, q2):
+        # For explanation see: https://en.wikipedia.org/wiki/Line-sphere_intersection
         # Check for collisions in the path between two configurations q1 and q2
         for obstacle in self.obstacles:
-            cx, cy, r = self.obstacles[obstacle]['position'][0], self.obstacles[obstacle]['position'][1], self.obstacles[obstacle]['radius']
-            x1, y1, x2, y2 = q1[0], q1[1], q2[0], q2[1]
+            cx, cy, cz, r = self.obstacles[obstacle]['position'][0], self.obstacles[obstacle]['position'][1], \
+            self.obstacles[obstacle]['position'][2], self.obstacles[obstacle]['radius']
+            x1, y1, z1, x2, y2, z2 = q1[0], q1[1], q1[2], q2[0], q2[1], q2[2]
 
-            m = (y2 - y1) / (x2 - x1)
-            c = y1 - m * x1
+            # Direction vector of the line
+            u = np.array([x2 - x1, y2 - y1, z2 - z1])
 
-            A = 1 + m**2
-            B = 2 * (m * c - m * cy - cx)
-            C = cx**2 + cy**2 + c**2 - 2 * cy * c - r**2
+            # Vector from the sphere's center to the line's origin
+            oc = np.array([x1 - cx, y1 - cy, z1 - cz])
 
-            discriminant = B**2 - 4 * A * C
+            a = np.dot(u, u)
+            b = 2 * np.dot(u, oc)
+            c = np.dot(oc, oc) - r ** 2
+
+            discriminant = b ** 2 - 4 * a * c
+
             if discriminant >= 0:
-                x_intersects = [(-B - np.sqrt(discriminant)) / (2 * A), (-B + np.sqrt(discriminant)) / (2 * A)]
-                y_intersects = [(m * x + c) for x in x_intersects]
-                for x,y in zip(x_intersects, y_intersects):
-                    if x1 <= x <= x2 or x2 <= x <= x1:
-                        if y1 <= y <= y2 or y2 <= y <= y1:
-                            #print("Generated path collides with an obstacle")
-                            return True
+                # Calculate possible intersection distances
+                d1 = (-b - np.sqrt(discriminant)) / (2 * a)
+                d2 = (-b + np.sqrt(discriminant)) / (2 * a)
+
+                # Check if the intersections are within the line segment
+                if 0 <= d1 <= 1 or 0 <= d2 <= 1:
+                    return True
+
         return False
     def path_cost(self, path):
         cost = 0
@@ -167,26 +177,39 @@ class RRTStar:
                 return self.shortest_path
         return None
 
-def illustrate_algorithm(rrt):
-    plt.figure()
+def illustrate_algorithm_3d(rrt):
+    fig = go.Figure()
+
     for node in rrt.nodes:
-        x,y = rrt.nodes[node].position
-        plt.scatter(x, y)
-        plt.text(x, y, str(node), fontsize=12, ha='right', va='bottom')  # Annotate with the node number
+        x, y, z = rrt.nodes[node].position
+        fig.add_trace(go.Scatter3d(x=[x], y=[y], z=[z], mode='markers+text', text=[str(node)], textposition='bottom center'))
+
     for edge in rrt.edges:
         node_1 = rrt.nodes[rrt.edges[edge][0]]
         node_2 = rrt.nodes[rrt.edges[edge][1]]
-        plt.plot([node_1.position[0], node_2.position[0]], [node_1.position[1], node_2.position[1]], 'm-', lw=2)
-    for obstacle in rrt.obstacles:
-        circle = obstacles[obstacle]
-        circle_patch = patches.Circle((circle['position'][0], circle['position'][1]), circle['radius'], edgecolor='orange', facecolor='none', linewidth=2, label='Circle')
-        plt.gca().add_patch(circle_patch)
-    plt.show()
+        fig.add_trace(go.Scatter3d(x=[node_1.position[0], node_2.position[0]],
+                                  y=[node_1.position[1], node_2.position[1]],
+                                  z=[node_1.position[2], node_2.position[2]],
+                                  mode='lines'))
 
+    for obstacle in rrt.obstacles:
+        sphere = rrt.obstacles[obstacle]
+        u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
+        x = sphere['position'][0] + sphere['radius'] * np.cos(u) * np.sin(v)
+        y = sphere['position'][1] + sphere['radius'] * np.sin(u) * np.sin(v)
+        z = sphere['position'][2] + sphere['radius'] * np.cos(v)
+        fig.add_trace(go.Surface(x=x, y=y, z=z, opacity=0.5))
+
+    fig.show()
 
 if __name__ == "__main__":
     obstacles = {1:{'position': [1, 1, 0], 'radius': 0.5}, 2:{'position': [2, 2, 0], 'radius': 0.5}, 3:{'position': [-2, -1.5, 0], 'radius': 0.5}}
-    rrt_star = RRTStar(start=[0, 0], goal=[3, 3], bounds={'xmin': -8, 'xmax': 8, 'ymin': -8, 'ymax': 8, 'zmin': 0, 'zmax': 0}, obstacles=obstacles)
+    for i in range(12):
+        obstacles[i+4] = {'position': [np.random.uniform(0, 4), np.random.uniform(0, 4), np.random.uniform(0, 3)], 'radius': 0.5}
+    rrt_star = RRTStar(start=[0, 0, 0], goal=[5, 5, 0], bounds={'xmin': 0, 'xmax': 5.5, 'ymin': 0, 'ymax': 5.5, 'zmin': 0, 'zmax': 0}, obstacles=obstacles)
     shortest_path = rrt_star.full_run()
     print(f'Shortest path: {shortest_path}')
-    illustrate_algorithm(rrt_star)
+    for node in shortest_path:
+        print(rrt_star.nodes[node])
+    illustrate_algorithm_3d(rrt_star)
+
