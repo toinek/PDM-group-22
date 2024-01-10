@@ -126,7 +126,8 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
                     action[0] = 0
                     action[1] = angular_vel
                     ob, *_ = env.step(action)
-                    if abs(angle_error) < 0.05:
+                    print(f'angle error: {angle_error}')
+                    if abs(angle_error) < 0.04:
                         angle_reached = True
                         print("angle reached")
                         target_reached = False
