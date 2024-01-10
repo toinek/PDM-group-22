@@ -4,7 +4,6 @@ import numpy as np
 from urdfenvs.robots.generic_urdf.generic_diff_drive_robot import GenericDiffDriveRobot
 from urdfenvs.urdf_common.urdf_env import UrdfEnv
 from mpscenes.obstacles.sphere_obstacle import SphereObstacle
-
 from global_path_planning_3d import RRTStar, Node
 
 def add_obstacles(env, pos, radius):
@@ -23,7 +22,6 @@ def get_robot_config(ob):
     return [x, y, angular]
 
 class PIDcontroller:
-
     # a pid controller to control the angular velocity of the robot, aiming at the next target
     def __init__(self, kp, ki, kd, dt):
         self.kp = kp
@@ -102,9 +100,11 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
         pos=np.array([0, 0, -0.5*np.pi, 0.0, 0.0, 0.0, -1.5, 0.0, 1.8, 0.5])
     )
     ob = ob[0]
+
     #loop door de steps heen, voer een actie uit met env.step(action)
     for _ in range(n_steps):
         # ob, *_ = env.step(action)
+        
         x = np.round(ob['robot_0']['joint_state']['position'], 1)[0]
         y = np.round(ob['robot_0']['joint_state']['position'], 1)[1]
         angular = np.round(ob['robot_0']['joint_state']['position'], 1)[2]
@@ -145,39 +145,33 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
                                 target_reached = True
                                 break
 
-
-
-
-                # while error < 0.02:
-                #     x = np.round(ob['robot_0']['joint_state']['position'], 1)[0]
-                #     y = np.round(ob['robot_0']['joint_state']['position'], 1)[1]
-                #     print(np.round(ob['robot_0']['joint_state']['position'], 1))
-                #     angular = np.round(ob['robot_0']['joint_state']['position'], 1)[2]
-                #     # print("test")
-                #     action[1] = 0
-                #     action[0] = 0.5
-                #     ob, *_ = env.step(action)
-                #
-                #     # move to next target when previous target is reached within 0.1m, taking into account that coordinates can be negative
-                #     if abs(target[0]) - abs(x) < 0.1 and abs(target[1]) - abs(y) < 0.2:
-                #         action[0] = 0
-                #         ob, *_ = env.step(action)
-                #         print('target reached')
-                #         reached = True
-                #         break
-
-                
-
-                
-
-
-            
-                
-            
-
-
-        # print(f'Albert position: {x}, {y}, angle: {angular}')
     env.close()
+
+# class RobotArmController:
+#     def __init__(self, kp, ki, kd, dt):
+#         self.kp = kp
+#         self.ki = ki
+#         self.kd = kd
+#         self.dt = dt
+#         self.error_sum = 0
+#         self.error_prev = 0
+
+#     def update(self, error, dt):
+#         self.error_sum += error * dt
+#         error_diff = (error - self.error_prev) / dt
+#         self.error_prev = error
+#         return self.kp * error + self.ki * self.error_sum + self.kd * error_diff
+
+# def get_robot_arm_config(ob):
+#     # get joint configurations
+
+
+# def move_robot_arm_to_target(env, target_position):
+#     arm_controller = RobotArmController(1.0, 0.0, 0.001, 0.01)
+
+
+    # get the current position of the robot arm
+    
 
 
 if __name__ == "__main__":
