@@ -7,6 +7,8 @@ from mpscenes.obstacles.sphere_obstacle import SphereObstacle
 from global_path_planning_3d import RRTStar, Node
 from sympy import symbols, atan2, sqrt, cos, sin
 
+
+
 def add_obstacles(env, pos, radius):
     sphere_obst_dict = {
         "type": "sphere",
@@ -21,6 +23,54 @@ def get_robot_config(ob):
     y = np.round(ob['robot_0']['joint_state']['position'], 1)[1]
     angular = np.round(ob['robot_0']['joint_state']['position'], 1)[2]
     return [x, y, angular]
+
+
+def get_joint_angles(ob):
+    q1 = np.round(ob['robot_0']['joint_state']['position'], 1)[3] - np.pi / 4
+    q2 = np.round(ob['robot_0']['joint_state']['position'], 1)[4]
+    q3 = np.round(ob['robot_0']['joint_state']['position'], 1)[5]
+    q4 = np.round(ob['robot_0']['joint_state']['position'], 1)[6]
+    q5 = np.round(ob['robot_0']['joint_state']['position'], 1)[7]
+    q6 = np.round(ob['robot_0']['joint_state']['position'], 1)[8]
+    q7 = np.round(ob['robot_0']['joint_state']['position'], 1)[9]
+    flange = np.round(ob['robot_0']['joint_state']['position'], 1)[10]
+
+    theta = [q1, q2, q3, q4, q5, q6, q7, flange]
+
+    return theta
+
+
+def get_endpoint_position(ob):
+    # forward kinematics
+    theta = get_joint_angles(ob)
+    # DH parameters
+    d = [0.333, 0, -0.316, 0, 0.384, 0, 0, 0.107]
+    a = [0, 0, 0, 0.0825, -0.0825, 0, 0.088, 0]
+    alpha = [0, -np.pi / 2, np.pi, np.pi / 2, -np.pi / 2, np.pi / 2, np.pi / 2, 0]
+
+    # transformation matrices
+    T = np.zeros((4, 4, 8))
+    for i in range(8):
+        T[:, :, i] = np.array([
+            [cos(theta[i]), -sin(theta[i]) * cos(alpha[i]), sin(theta[i]) * sin(alpha[i]), a[i] * cos(theta[i])],
+            [sin(theta[i]), cos(theta[i]) * cos(alpha[i]), -cos(theta[i]) * sin(alpha[i]), a[i] * sin(theta[i])],
+            [0, sin(alpha[i]), cos(alpha[i]), d[i]],
+            [0, 0, 0, 1]
+        ])
+
+    # end-effector position
+    end_effector_pos = np.dot(T[:, :, 0], np.dot(T[:, :, 1], np.dot(T[:, :, 2], np.dot(T[:, :, 3], np.dot(T[:, :, 4],
+                                                                                                          np.dot(T[:, :,
+                                                                                                                 5],
+                                                                                                                 T[:, :,
+                                                                                                                 6]))))))
+    x, y, z = end_effector_pos[:3, 3]
+    pose = [-x, -y, z]
+    return pose
+
+
+# def inverse_kinematics(target_pose):
+
 
 class PIDcontroller:
     # a pid controller to control the angular velocity of the robot, aiming at the next target
@@ -39,7 +89,7 @@ class PIDcontroller:
         return self.kp * error + self.ki * self.error_sum + self.kd * error_diff
     
 
-def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
+def run_albert(n_steps=10000, render=False, goal=True, obstacles=True):
     robots = [
         GenericDiffDriveRobot(
             urdf="albert.urdf",
@@ -106,10 +156,9 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
     ob = ob[0]
     #loop door de steps heen, voer een actie uit met env.step(action)
     for _ in range(n_steps):
-        ob, *_ = env.step(action)
 
         pose = get_endpoint_position(ob)
-        
+        print(pose)
         
 
         # print(f'x: {x}, y: {y}, z: {z}')
@@ -125,69 +174,7 @@ def run_albert(n_steps=1000, render=False, goal=True, obstacles=True):
         action[2] = 0.1 # joint 1
         ob, *_ = env.step(action)
     
-        env.close()
-        
-def get_joint_angles(ob):
-    q1 = np.round(ob['robot_0']['joint_state']['position'], 1)[3] - np.pi/4
-    q2 = np.round(ob['robot_0']['joint_state']['position'], 1)[4]
-    q3 = np.round(ob['robot_0']['joint_state']['position'], 1)[5]
-    q4 = np.round(ob['robot_0']['joint_state']['position'], 1)[6]
-    q5 = np.round(ob['robot_0']['joint_state']['position'], 1)[7]
-    q6 = np.round(ob['robot_0']['joint_state']['position'], 1)[8]
-    q7 = np.round(ob['robot_0']['joint_state']['position'], 1)[9]
-    flange = np.round(ob['robot_0']['joint_state']['position'], 1)[10]
-
-    theta = [q1, q2, q3, q4, q5, q6, q7, flange]
-    
-    return theta
-
-
-# class ArmPIDcontroller():
-#     def __init__(self, kp, ki, kd, dt):
-#         self.kp = kp
-#         self.ki = ki
-#         self.kd = kd
-#         self.dt = dt
-#         self.error_sum = 0
-#         self.error_prev = 0
-
-#     def update(self, error, dt):
-#         self.error_sum += error * dt
-#         error_diff = (error - self.error_prev) / dt
-#         self.error_prev = error
-#         return self.kp * error + self.ki * self.error_sum + self.kd * error_diff
-    
-
-
-
-
-def get_endpoint_position(ob):
-    # forward kinematics
-    theta = get_joint_angles(ob)
-    # DH parameters
-    d = [0.333, 0, -0.316, 0, 0.384, 0, 0, 0.107]
-    a = [0, 0, 0, 0.0825, -0.0825, 0, 0.088, 0]
-    alpha = [0, -np.pi/2, np.pi, np.pi/2, -np.pi/2, np.pi/2, np.pi/2, 0]
-
-    # transformation matrices
-    T = np.zeros((4,4,8))
-    for i in range(8):
-        T[:,:,i] = np.array([
-            [cos(theta[i]), -sin(theta[i]) * cos(alpha[i]), sin(theta[i]) * sin(alpha[i]), a[i] * cos(theta[i])],
-            [sin(theta[i]), cos(theta[i]) * cos(alpha[i]), -cos(theta[i]) * sin(alpha[i]), a[i] * sin(theta[i])],
-            [0, sin(alpha[i]), cos(alpha[i]), d[i]],
-            [0, 0, 0, 1]
-        ])
-    
-    # end-effector position
-    end_effector_pos = np.dot(T[:,:,0], np.dot(T[:,:,1], np.dot(T[:,:,2], np.dot(T[:,:,3], np.dot(T[:,:,4], np.dot(T[:,:,5], T[:,:,6]))))))
-    x, y, z = end_effector_pos[:3,3]
-    pose = [-x, -y, z]
-    return pose
-
-# def inverse_kinematics(target_pose):
-
-
+    env.close()
 
 
 if __name__ == "__main__":
