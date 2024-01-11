@@ -68,7 +68,7 @@ def get_endpoint_position(ob):
     pose = [-end_effector_pos[0], -end_effector_pos[1], end_effector_pos[2]]
     return pose
 
-# write a function: get_target_angles(target_position, ob) that changes the joint angles of only 1,4 and 6 to reach the target position using pybullet
+# write a function: get_target_angles(target_position, ob) that changes the joint angles of only 1 and 2 and 6 to reach the target position using pybullet
 def get_target_angles(target_position, ob):
     # forward kinematics
     theta = get_joint_angles(ob)
@@ -98,16 +98,59 @@ def get_target_angles(target_position, ob):
     # calculate thetas
     target_theta = np.zeros(8)
     target_theta[0] = np.arctan2(pose[1], pose[0]) 
-    target_theta[1] = 0
+    target_theta[1] = np.arctan2(pose[2] - d[0], np.sqrt(pose[0]**2 + pose[1]**2)) - np.arctan2(a[3], d[2])
     target_theta[2] = 0
     target_theta[3] = np.arctan2(pose[2] - d[0], np.sqrt(pose[0]**2 + pose[1]**2)) - np.arctan2(a[3], d[2])
     target_theta[4] = 0
-    target_theta[5] = np.arctan2(np.sqrt(pose[0]**2 + pose[1]**2) - a[3]*np.cos(target_theta[3]), pose[2] - d[0] - a[3]*np.sin(target_theta[3])) - target_theta[3]
+    target_theta[5] = 0
     target_theta[6] = 0
     target_theta[7] = 0
 
 
     return target_theta
+
+
+
+
+# def get_target_angles(target_position, ob):
+#     # forward kinematics
+#     theta = get_joint_angles(ob)
+#     # DH parameters
+#     d = [1.333, 0, -0.316, 0, 0.384, 0, 0, 0.107]
+#     a = [0, 0, 0, 0.0825, -0.0825, 0, 0.088, 0]
+#     alpha = [0, -np.pi / 2, np.pi/2, np.pi / 2, -np.pi / 2, np.pi / 2, np.pi / 2, 0]
+
+#     # initialize transformation matrix to identity
+#     T = np.eye(4)
+
+#     # calculate cumulative transformation matrix
+#     for i in range(len(theta)):
+#         current_T = np.array([
+#             [np.cos(theta[i]), -np.sin(theta[i]) * np.cos(alpha[i]), np.sin(theta[i]) * np.sin(alpha[i]), a[i] * np.cos(theta[i])],
+#             [np.sin(theta[i]), np.cos(theta[i]) * np.cos(alpha[i]), -np.cos(theta[i]) * np.sin(alpha[i]), a[i] * np.sin(theta[i])],
+#             [0, np.sin(alpha[i]), np.cos(alpha[i]), d[i]],
+#             [0, 0, 0, 1]
+#         ])
+#         T = np.dot(T, current_T)
+
+#     # end-effector position
+#     end_effector_pos = T[:3, 3]
+#     pose = [-end_effector_pos[0], -end_effector_pos[1], end_effector_pos[2]]
+
+#     # inverse kinematics
+#     # calculate thetas
+#     target_theta = np.zeros(8)
+#     target_theta[0] = np.arctan2(pose[1], pose[0]) 
+    
+#     target_theta[2] = 0
+#     target_theta[3] = np.arctan2(pose[2] - d[0], np.sqrt(pose[0]**2 + pose[1]**2)) - np.arctan2(a[3], d[2])
+#     target_theta[4] = 0
+#     target_theta[5] = 0
+#     target_theta[6] = 0
+#     target_theta[7] = 0
+
+
+#     return target_theta
 
 
 class PIDcontroller:
@@ -149,7 +192,7 @@ def run_albert(n_steps=10000, render=False, goal=True, obstacles=True):
 
     add_obstacles(env, [1.5, 0, 0], 0.5)
     add_obstacles(env, [1.5, 2, 3], 0.5)
-    add_obstacles(env, [0.431956668323747, 0.00488579951244365, 1.02600000000000], 0.01)
+    add_obstacles(env, [0.2, 0.2, 1.5], 0.01)
 
     # # print the obstacles within the environment
     # for obstacle in env.get_obstacles():
@@ -192,7 +235,7 @@ def run_albert(n_steps=10000, render=False, goal=True, obstacles=True):
         pos=np.array([0, 0, -0.5*np.pi, 0.0, 0.0, 0.0, 0, 0.0, 0, 0, 0])
     )
     ob = ob[0]
-    target_position = [0.5, 0.5, 1.4]
+    target_position = [0.2, 0.2, 1.5]
     target_angles = get_target_angles(target_position, ob)
     #loop door de steps heen, voer een actie uit met env.step(action)
     for _ in range(n_steps):
@@ -215,29 +258,35 @@ def run_albert(n_steps=10000, render=False, goal=True, obstacles=True):
             error_q1 = target_angles[0] - theta[0]
             pid_q1 = PIDcontroller(0.5, 0., 0.001, 0.01)
             action[2] = pid_q1.update(error_q1, 0.01)
-            print(f'error_q1: {error_q1}')
+            print(f'error_q1: {error_q1}') 
             ob, *_ = env.step(action)
             if np.abs(error_q1) < 0.02:
                 reached_1 = True
                 
         while not reached_2:
             theta = get_joint_angles(ob)
-            error_q4 = target_angles[3] - theta[3] 
-            pid_q4 = PIDcontroller(0.5, 0., 0.001, 0.01)
-            action[5] = pid_q4.update(error_q4, 0.01)
-            print(f'error_q4: {error_q4}')
+            error_q2 = np.abs(target_angles[1] - theta[1]) - np.pi
+            # if the error is positive, the robot needs to move counterclockwise
+            if target_angles[1] - theta[1] > 0:
+                pid_q2 = PIDcontroller(0.5, 0., 0.001, 0.01)
+                action[3] = pid_q2.update(error_q2, 0.01)
+            elif target_angles[1] - theta[1] < 0:
+                pid_q2 = PIDcontroller(0.5, 0., 0.001, 0.01)
+                action[3] = -pid_q2.update(error_q2, 0.01)
+
+            print(f'error_q2: {error_q2}')
             ob, *_ = env.step(action)
-            if np.abs(error_q4) < 0.042:
+            if np.abs(error_q2) < 0.042:
                 reached_2 = True
 
         while not reached_3:
             theta = get_joint_angles(ob)
-            error_q6 = target_angles[5] - theta[5]
-            pid_q6 = PIDcontroller(0.5, 0., 0.001, 0.01)
-            action[7] = pid_q6.update(error_q6, 0.01)
-            print(f'error_q6: {error_q6}')
+            error_q4 = target_angles[3] - theta[3]
+            pid_q4 = PIDcontroller(0.5, 0., 0.001, 0.01)
+            action[5] = pid_q4.update(error_q4, 0.01)
+            print(f'error_q4: {error_q4}')
             ob, *_ = env.step(action)
-            if np.abs(error_q6) < 0.02:
+            if np.abs(error_q4) < 0.02:
                 reached_3 = True
                 print('reached')
                 break
