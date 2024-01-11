@@ -1,11 +1,13 @@
 import warnings
 import gymnasium as gym
 import numpy as np
+
+import pybullet as p
+import pybullet_data
 from urdfenvs.robots.generic_urdf.generic_diff_drive_robot import GenericDiffDriveRobot
 from urdfenvs.urdf_common.urdf_env import UrdfEnv
 from mpscenes.obstacles.sphere_obstacle import SphereObstacle
 from global_path_planning_3d import RRTStar, Node
-from sympy import symbols, atan2, sqrt, cos, sin
 
 
 
@@ -26,7 +28,7 @@ def get_robot_config(ob):
 
 
 def get_joint_angles(ob):
-    q1 = np.round(ob['robot_0']['joint_state']['position'], 1)[3] - np.pi / 4
+    q1 = np.round(ob['robot_0']['joint_state']['position'], 1)[3] - np.pi/4
     q2 = np.round(ob['robot_0']['joint_state']['position'], 1)[4]
     q3 = np.round(ob['robot_0']['joint_state']['position'], 1)[5]
     q4 = np.round(ob['robot_0']['joint_state']['position'], 1)[6]
@@ -44,32 +46,68 @@ def get_endpoint_position(ob):
     # forward kinematics
     theta = get_joint_angles(ob)
     # DH parameters
-    d = [0.333, 0, -0.316, 0, 0.384, 0, 0, 0.107]
+    d = [1.333, 0, -0.316, 0, 0.384, 0, 0, 0.107]
     a = [0, 0, 0, 0.0825, -0.0825, 0, 0.088, 0]
-    alpha = [0, -np.pi / 2, np.pi, np.pi / 2, -np.pi / 2, np.pi / 2, np.pi / 2, 0]
+    alpha = [0, -np.pi / 2, np.pi/2, np.pi / 2, -np.pi / 2, np.pi / 2, np.pi / 2, 0]
 
-    # transformation matrices
-    T = np.zeros((4, 4, 8))
-    for i in range(8):
-        T[:, :, i] = np.array([
-            [cos(theta[i]), -sin(theta[i]) * cos(alpha[i]), sin(theta[i]) * sin(alpha[i]), a[i] * cos(theta[i])],
-            [sin(theta[i]), cos(theta[i]) * cos(alpha[i]), -cos(theta[i]) * sin(alpha[i]), a[i] * sin(theta[i])],
-            [0, sin(alpha[i]), cos(alpha[i]), d[i]],
+    # initialize transformation matrix to identity
+    T = np.eye(4)
+
+    # calculate cumulative transformation matrix
+    for i in range(len(theta)):
+        current_T = np.array([
+            [np.cos(theta[i]), -np.sin(theta[i]) * np.cos(alpha[i]), np.sin(theta[i]) * np.sin(alpha[i]), a[i] * np.cos(theta[i])],
+            [np.sin(theta[i]), np.cos(theta[i]) * np.cos(alpha[i]), -np.cos(theta[i]) * np.sin(alpha[i]), a[i] * np.sin(theta[i])],
+            [0, np.sin(alpha[i]), np.cos(alpha[i]), d[i]],
             [0, 0, 0, 1]
         ])
+        T = np.dot(T, current_T)
 
     # end-effector position
-    end_effector_pos = np.dot(T[:, :, 0], np.dot(T[:, :, 1], np.dot(T[:, :, 2], np.dot(T[:, :, 3], np.dot(T[:, :, 4],
-                                                                                                          np.dot(T[:, :,
-                                                                                                                 5],
-                                                                                                                 T[:, :,
-                                                                                                                 6]))))))
-    x, y, z = end_effector_pos[:3, 3]
-    pose = [-x, -y, z]
+    end_effector_pos = T[:3, 3]
+    pose = [-end_effector_pos[0], -end_effector_pos[1], end_effector_pos[2]]
     return pose
 
+# write a function: get_target_angles(target_position, ob) that changes the joint angles of only 1,4 and 6 to reach the target position using pybullet
+def get_target_angles(target_position, ob):
+    # forward kinematics
+    theta = get_joint_angles(ob)
+    # DH parameters
+    d = [1.333, 0, -0.316, 0, 0.384, 0, 0, 0.107]
+    a = [0, 0, 0, 0.0825, -0.0825, 0, 0.088, 0]
+    alpha = [0, -np.pi / 2, np.pi/2, np.pi / 2, -np.pi / 2, np.pi / 2, np.pi / 2, 0]
 
-# def inverse_kinematics(target_pose):
+    # initialize transformation matrix to identity
+    T = np.eye(4)
+
+    # calculate cumulative transformation matrix
+    for i in range(len(theta)):
+        current_T = np.array([
+            [np.cos(theta[i]), -np.sin(theta[i]) * np.cos(alpha[i]), np.sin(theta[i]) * np.sin(alpha[i]), a[i] * np.cos(theta[i])],
+            [np.sin(theta[i]), np.cos(theta[i]) * np.cos(alpha[i]), -np.cos(theta[i]) * np.sin(alpha[i]), a[i] * np.sin(theta[i])],
+            [0, np.sin(alpha[i]), np.cos(alpha[i]), d[i]],
+            [0, 0, 0, 1]
+        ])
+        T = np.dot(T, current_T)
+
+    # end-effector position
+    end_effector_pos = T[:3, 3]
+    pose = [-end_effector_pos[0], -end_effector_pos[1], end_effector_pos[2]]
+
+    # inverse kinematics
+    # calculate thetas
+    target_theta = np.zeros(8)
+    target_theta[0] = np.arctan2(pose[1], pose[0]) 
+    target_theta[1] = 0
+    target_theta[2] = 0
+    target_theta[3] = np.arctan2(pose[2] - d[0], np.sqrt(pose[0]**2 + pose[1]**2)) - np.arctan2(a[3], d[2])
+    target_theta[4] = 0
+    target_theta[5] = np.arctan2(np.sqrt(pose[0]**2 + pose[1]**2) - a[3]*np.cos(target_theta[3]), pose[2] - d[0] - a[3]*np.sin(target_theta[3])) - target_theta[3]
+    target_theta[6] = 0
+    target_theta[7] = 0
+
+
+    return target_theta
 
 
 class PIDcontroller:
@@ -111,7 +149,7 @@ def run_albert(n_steps=10000, render=False, goal=True, obstacles=True):
 
     add_obstacles(env, [1.5, 0, 0], 0.5)
     add_obstacles(env, [1.5, 2, 3], 0.5)
-    add_obstacles(env, [0.10734279422187419, 0.4237077861241885, 1.04010572868276334], 0.05)
+    add_obstacles(env, [0.431956668323747, 0.00488579951244365, 1.02600000000000], 0.01)
 
     # # print the obstacles within the environment
     # for obstacle in env.get_obstacles():
@@ -151,28 +189,67 @@ def run_albert(n_steps=10000, render=False, goal=True, obstacles=True):
 
     # initial position
     ob = env.reset(
-        pos=np.array([0, 0, -0.5*np.pi, 0.0, 0.0, 0.0, 0, 0.0, 0, 0])
+        pos=np.array([0, 0, -0.5*np.pi, 0.0, 0.0, 0.0, 0, 0.0, 0, 0, 0])
     )
     ob = ob[0]
+    target_position = [0.5, 0.5, 1.4]
+    target_angles = get_target_angles(target_position, ob)
     #loop door de steps heen, voer een actie uit met env.step(action)
     for _ in range(n_steps):
 
-        pose = get_endpoint_position(ob)
-        print(pose)
+        # get the current joint angles
+        
+        
         
 
-        # print(f'x: {x}, y: {y}, z: {z}')
+        # get the target joint angles
+    
 
-        # x = np.round(ob['robot_0']['joint_state']['position'], 1)[0]
-        # y = np.round(ob['robot_0']['joint_state']['position'], 1)[1]
-        # z = np.round(ob['robot_0']['joint_state']['position'], 1)[2]
+        # minimize the error using pid controller
+        reached_1 = False
+        reached_2 = False
+        reached_3 = False
 
-        # print(f'x: {x}, y: {y}, z: {z}')
-        # q_1_7 = inverse_kinematics(x, y, z)
+        while not reached_1:
+            theta = get_joint_angles(ob)
+            error_q1 = target_angles[0] - theta[0]
+            pid_q1 = PIDcontroller(0.5, 0., 0.001, 0.01)
+            action[2] = pid_q1.update(error_q1, 0.01)
+            print(f'error_q1: {error_q1}')
+            ob, *_ = env.step(action)
+            if np.abs(error_q1) < 0.02:
+                reached_1 = True
+                
+        while not reached_2:
+            theta = get_joint_angles(ob)
+            error_q4 = target_angles[3] - theta[3] 
+            pid_q4 = PIDcontroller(0.5, 0., 0.001, 0.01)
+            action[5] = pid_q4.update(error_q4, 0.01)
+            print(f'error_q4: {error_q4}')
+            ob, *_ = env.step(action)
+            if np.abs(error_q4) < 0.042:
+                reached_2 = True
+
+        while not reached_3:
+            theta = get_joint_angles(ob)
+            error_q6 = target_angles[5] - theta[5]
+            pid_q6 = PIDcontroller(0.5, 0., 0.001, 0.01)
+            action[7] = pid_q6.update(error_q6, 0.01)
+            print(f'error_q6: {error_q6}')
+            ob, *_ = env.step(action)
+            if np.abs(error_q6) < 0.02:
+                reached_3 = True
+                print('reached')
+                break
+
+
+   
         
-        # action[0] = -0.3
-        action[2] = 0.1 # joint 1
-        ob, *_ = env.step(action)
+        
+
+
+        # perform the action
+        
     
     env.close()
 
