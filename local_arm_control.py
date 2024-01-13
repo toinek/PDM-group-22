@@ -11,3 +11,12 @@ class PIDControllerArm():
         self.angle_reached = False
         self.target_reached = False
 
+    def get_angular_vel(self, error):
+        self.error_sum += error * self.dt
+        error_diff = (error - self.error_prev) / self.dt
+        self.error_prev = error
+        angular_vel = self.kp * error + self.ki * self.error_sum + self.kd * error_diff
+        return angular_vel
+    
+    
+

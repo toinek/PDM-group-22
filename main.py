@@ -7,6 +7,7 @@ from mpscenes.obstacles.sphere_obstacle import SphereObstacle
 
 from global_path_planning_3d import RRTStar
 from local_path_planning import PIDControllerBase
+from local_arm_control import PIDControllerArm
 from add_obstacles import ObstacleAdder
 
 def add_obstacles(env, pos, radius):
@@ -86,7 +87,8 @@ def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
 
     # Perform n steps and follow the computed path
     # base_control = PIDControllerBase(path_points, 0.05, 0., 0.001, 0.01)
-    goal = [0.266594590604942, -0.0, 1.4062365019198466]
+
+    arm_pid_controller = PIDControllerArm(0.5, 0., 0.001, 0.01)
     #add_obstacles(env, goal, 0.01)
     for _ in range(n_steps):
         # robot_config = get_robot_config(ob)
@@ -99,9 +101,12 @@ def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
 
         # Control the arm
         end_pos = [0.4825, 0, 1.2]
-        add_obstacles(env, end_pos, 0.01)
+        
+        # add_obstacles(env, end_pos, 0.01)
         neutral_joint_pos = [-0.120625, 0, 0.958]
         link_length = 0.649864421
+        goal = [-0.120625, 0, 0.958 + link_length-0.2]
+        
         x_robot,y_robot,angular = get_robot_config(ob)[0], get_robot_config(ob)[1], get_robot_config(ob)[2]
 
         # x_joint = x_robot - (link_length - (np.cos(angular)*link_length))
@@ -109,26 +114,37 @@ def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
         x_joint = -(link_length - (np.cos(angular)*link_length))
         y_joint = np.sin(angular) * link_length
 
-        add_obstacles(env, [float(x_joint), float(y_joint), 1.8], 0.01)
+        # add_obstacles(env, [float(x_joint), float(y_joint), 1.8], 0.01)
         joint_pos = [x_joint, y_joint, neutral_joint_pos[2]]
 
-        theta = np.round(ob['robot_0']['joint_state']['position'], 1)[4] + 0.9#1.189218407
-        end_effector_pos = [x_joint + link_length*np.cos(theta), y_joint, (neutral_joint_pos[2] + link_length*np.sin(theta)- 0.2)]
+        theta = (np.round(ob['robot_0']['joint_state']['position'], 1)[4] + 0.9)#1.189218407)
+        end_effector_pos = [(x_joint + link_length*np.sin(theta)), y_joint, (neutral_joint_pos[2] + link_length*np.cos(theta)- 0.2)]
 
-        add_obstacles(env, [float(end_effector_pos[0]), float(end_effector_pos[1]), 1.1], 0.01)
-
-        print(f'end_effector_pos: {end_effector_pos}')
+        # Calculate the error between the endpoint and goal
         error = np.sqrt((end_effector_pos[0] - goal[0])**2 + (end_effector_pos[1] - goal[1])**2 + (end_effector_pos[2] - goal[2])**2)
-        angular_vel = 0.1*error
-        print(f'angular_vel: {angular_vel}')
-        action[1] = 2.5
+        print(f'error: {error}')
+
+        angular_vel = arm_pid_controller.get_angular_vel(error)
+        # angular velocity should be negative if the end effector is to the left of the goal
+        if end_effector_pos[0] > goal[0]:
+            angular_vel = -angular_vel
+
+
+        action[3] = angular_vel
+
+
+        # print(f'error_x: {error_x}, error_y: {error_y}, error_z: {error_z}')
+        # print(f'error: {error}')
+
+
+
+
         # action[3] = angular_vel
             # x = float(np.round(end_effector_pos[0], 2))
             # y = float(np.round(end_effector_pos[1], 2))
             # z = float(np.round(end_effector_pos[2], 2))
             # add_obstacles(env, [x,y,z], 0.01)
-        print(f'x_robot: {x_robot}, y_robot: {y_robot}, angular: {angular}')
-        print(f'x_joint: {x_joint}, y_joint: {y_joint}')
+    
         ob, *_ = env.step(action)
 
     env.close()
