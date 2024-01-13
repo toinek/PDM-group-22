@@ -86,26 +86,29 @@ def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
     action = np.zeros(env.n())
 
     # Perform n steps and follow the computed path
-    # base_control = PIDControllerBase(path_points, 0.05, 0., 0.001, 0.01)
+    link_length = 0.649864421
+    path_points = [[-0.120625 -1.5, 0 -1.5, 0.958 + link_length - 0.2]]
+    base_control = PIDControllerBase(path_points, 5, 0., 0.001, 0.01)
 
     arm_pid_controller = PIDControllerArm(0.5, 0., 0.001, 0.01)
     #add_obstacles(env, goal, 0.01)
     for _ in range(n_steps):
-        # robot_config = get_robot_config(ob)
-        # forward_velocity, angular_velocity = base_control.follow_path(robot_config)
-        # action[0] = forward_velocity
-        # action[1] = angular_velocity
-        # print(f'forward velocity: {forward_velocity}, angular velocity: {angular_velocity}')
-
-        ob, *_ = env.step(action)
+        robot_config = get_robot_config(ob)
+        forward_velocity, angular_velocity = base_control.follow_path(robot_config)
+        action[0] = forward_velocity*0.1
+        action[1] = angular_velocity*0.5
+        print(f'forward velocity: {forward_velocity}, angular velocity: {angular_velocity}')
 
         # Control the arm
         end_pos = [0.4825, 0, 1.2]
         
         # add_obstacles(env, end_pos, 0.01)
         neutral_joint_pos = [-0.120625, 0, 0.958]
-        link_length = 0.649864421
-        goal = [-0.120625, 0, 0.958 + link_length-0.2]
+        
+        goal = [-0.120625 -1.5, 0 -1.5, 0.958 + link_length - 0.2]
+        add_obstacles(env, goal, 0.01)
+
+        
         
         x_robot,y_robot,angular = get_robot_config(ob)[0], get_robot_config(ob)[1], get_robot_config(ob)[2]
 
@@ -114,23 +117,33 @@ def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
         x_joint = -(link_length - (np.cos(angular)*link_length))
         y_joint = np.sin(angular) * link_length
 
-        # add_obstacles(env, [float(x_joint), float(y_joint), 1.8], 0.01)
-        joint_pos = [x_joint, y_joint, neutral_joint_pos[2]]
-
-        theta = (np.round(ob['robot_0']['joint_state']['position'], 1)[4] + 0.9)#1.189218407)
-        end_effector_pos = [(x_joint + link_length*np.sin(theta)), y_joint, (neutral_joint_pos[2] + link_length*np.cos(theta)- 0.2)]
-
+        
         # Calculate the error between the endpoint and goal
-        error = np.sqrt((end_effector_pos[0] - goal[0])**2 + (end_effector_pos[1] - goal[1])**2 + (end_effector_pos[2] - goal[2])**2)
-        print(f'error: {error}')
+        reached = True
 
-        angular_vel = arm_pid_controller.get_angular_vel(error)
-        # angular velocity should be negative if the end effector is to the left of the goal
-        if end_effector_pos[0] > goal[0]:
-            angular_vel = -angular_vel
+        # while the distance between the joint and the goal is equal to the link length, the base should stop moving
+        if link_length - 0.05 <= np.sqrt((neutral_joint_pos[0] - goal[0])**2 + (neutral_joint_pos[1] - goal[1])**2 + (neutral_joint_pos[2] - goal[2])**2) <= link_length + 0.05:
+            action[0] = 0
+            action[1] = 0
+            action[2] = 0
+            reached = False
 
+        
 
-        action[3] = angular_vel
+        while not reached:
+            theta = (np.round(ob['robot_0']['joint_state']['position'], 1)[4] + 0.9)#1.189218407)
+            end_effector_pos = [(x_joint + link_length*np.sin(theta)), y_joint, (neutral_joint_pos[2] + link_length*np.cos(theta)- 0.2)]
+            error = np.sqrt((end_effector_pos[0] - goal[0])**2 + (end_effector_pos[1] - goal[1])**2 + (end_effector_pos[2] - goal[2])**2)
+            print(f'error: {error}')
+            angular_vel = arm_pid_controller.get_angular_vel(error)
+            # angular velocity should be negative if the end effector is to the left of the goal
+            if end_effector_pos[0] > goal[0]:
+                angular_vel = -angular_vel
+            
+            action[3] = angular_vel
+            ob, *_ = env.step(action)
+            if error <= 0.05:
+                reached = True
 
 
         # print(f'error_x: {error_x}, error_y: {error_y}, error_z: {error_z}')
