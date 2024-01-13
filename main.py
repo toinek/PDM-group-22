@@ -55,8 +55,8 @@ def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
     # Add obstacles to the environment
     boundary = 16
     obstacle_adder = ObstacleAdder(env)
-    obstacle_adder.add_spheres()
-    obstacle_adder.add_walls(boundary)
+    # obstacle_adder.add_spheres()
+    # obstacle_adder.add_walls(boundary)
 
     # Algorithm inputs
     # bounds = {'xmin': -boundary/2, 'xmax': boundary/2, 'ymin': -boundary/2, 'ymax': boundary/2, 'zmin': 0, 'zmax': 3}
@@ -87,16 +87,18 @@ def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
 
     # Perform n steps and follow the computed path
     link_length = 0.649864421
-    path_points = [[-0.120625 -1.5, 0 -1.5, 0.958 + link_length - 0.2]]
-    base_control = PIDControllerBase(path_points, 5, 0., 0.001, 0.01)
+    
 
-    arm_pid_controller = PIDControllerArm(0.5, 0., 0.001, 0.01)
+    path_points = [[-1, -1, 1]]
+    base_control = PIDControllerBase(path_points, 0.5, 0., 0.001, 0.01)
+
+    arm_pid_controller = PIDControllerArm(1, 0., 0.001, 0.01)
     #add_obstacles(env, goal, 0.01)
     for _ in range(n_steps):
         robot_config = get_robot_config(ob)
         forward_velocity, angular_velocity = base_control.follow_path(robot_config)
-        action[0] = forward_velocity*0.1
-        action[1] = angular_velocity*0.5
+        action[0] = forward_velocity*0.5
+        action[1] = angular_velocity
         print(f'forward velocity: {forward_velocity}, angular velocity: {angular_velocity}')
 
         # Control the arm
@@ -105,8 +107,9 @@ def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
         # add_obstacles(env, end_pos, 0.01)
         neutral_joint_pos = [-0.120625, 0, 0.958]
         
-        goal = [-0.120625 -1.5, 0 -1.5, 0.958 + link_length - 0.2]
-        add_obstacles(env, goal, 0.01)
+        # add_obstacles(env, path_points[0], 0.01)
+
+        goal = path_points[0]
 
         
         
@@ -114,36 +117,78 @@ def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
 
         # x_joint = x_robot - (link_length - (np.cos(angular)*link_length))
         # y_joint = y_robot + np.sin(angular) * link_length
-        x_joint = -(link_length - (np.cos(angular)*link_length))
-        y_joint = np.sin(angular) * link_length
+        x_joint = x_robot - np.cos(angular) * (-neutral_joint_pos[0])
+        y_joint = y_robot - np.sin(angular) * (-neutral_joint_pos[0])
+        z_joint = 0.958 
 
+        # print(f'x_joint: {x_joint}, y_joint: {y_joint}, z_joint: {z_joint}')
+
+
+
+        x_joint = float(np.round(x_joint, 2))
+        y_joint = float(np.round(y_joint, 2))
+        
         
         # Calculate the error between the endpoint and goal
-        reached = True
-
+        reached_arm = True
+        target_reached = False
+       
+        # print(f'goal: {goal}')
         # while the distance between the joint and the goal is equal to the link length, the base should stop moving
-        if link_length - 0.05 <= np.sqrt((neutral_joint_pos[0] - goal[0])**2 + (neutral_joint_pos[1] - goal[1])**2 + (neutral_joint_pos[2] - goal[2])**2) <= link_length + 0.05:
+        # print("distance between joint and goal: ", np.sqrt((x_joint - goal[0])**2 + (y_joint - goal[1])**2 + (z_joint - goal[2])**2))
+        if np.sqrt((x_joint - path_points[0][0])**2 + (y_joint - path_points[0][1])**2 + (z_joint - path_points[0][2])**2) <= link_length:
             action[0] = 0
             action[1] = 0
             action[2] = 0
-            reached = False
+            reached_arm = False
 
         
 
-        while not reached:
-            theta = (np.round(ob['robot_0']['joint_state']['position'], 1)[4] + 0.9)#1.189218407)
-            end_effector_pos = [(x_joint + link_length*np.sin(theta)), y_joint, (neutral_joint_pos[2] + link_length*np.cos(theta)- 0.2)]
-            error = np.sqrt((end_effector_pos[0] - goal[0])**2 + (end_effector_pos[1] - goal[1])**2 + (end_effector_pos[2] - goal[2])**2)
-            print(f'error: {error}')
-            angular_vel = arm_pid_controller.get_angular_vel(error)
-            # angular velocity should be negative if the end effector is to the left of the goal
-            if end_effector_pos[0] > goal[0]:
-                angular_vel = -angular_vel
+        while not reached_arm:
+            previous_error = np.inf
+            theta = (np.round(ob['robot_0']['joint_state']['position'], 1)[4] + 0.9)  # 1.189218407)            end_effector_pos = [(x_joint + link_length*np.sin(theta)), y_joint + link_length*np.sin(theta), (neutral_joint_pos[2] + link_length*np.cos(theta)- 0.2)]
+            arm_length = np.cos(theta) * link_length
+            end_effector_pos = [(x_joint + arm_length * np.cos(angular)),
+                            (y_joint + arm_length * np.sin(angular)),
+                            (neutral_joint_pos[2] + np.sin(theta)*arm_length)]
+            print(f'end effector pos: {end_effector_pos}')
+            if end_effector_pos[2] < goal[2]:
+                error = goal[2] - end_effector_pos[2]
+                print(f'error: {error}')
+                angular_vel = -arm_pid_controller.get_angular_vel(error)
+            else:
+                error = end_effector_pos[2] - goal[2]
+                print(f'error: {error}')
+                angular_vel = arm_pid_controller.get_angular_vel(error)
             
             action[3] = angular_vel
             ob, *_ = env.step(action)
-            if error <= 0.05:
-                reached = True
+
+            if error > previous_error:
+                reached_arm = True
+                action[3] = 0
+                ob, *_ = env.step(action)
+                print('reached arm')
+                target_reached = True
+                break
+            elif error < 0.01:
+                reached_arm = True
+                action[3] = 0
+                ob, *_ = env.step(action)
+                print('reached arm')
+                target_reached = True
+                break
+
+            previous_error = error
+            # angular velocity should be negative if the end effector is in the positive goal angle
+            # if end_effector_pos[0] > goal[0]:
+            #     angular_vel = -angular_vel
+            
+
+        if target_reached:
+            print('target reached')
+            path_points.pop(0)
+            break
 
 
         # print(f'error_x: {error_x}, error_y: {error_y}, error_z: {error_z}')
