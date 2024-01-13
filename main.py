@@ -58,36 +58,36 @@ def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
     obstacle_adder.add_walls(boundary)
 
     # Algorithm inputs
-    bounds = {'xmin': -boundary/2, 'xmax': boundary/2, 'ymin': -boundary/2, 'ymax': boundary/2, 'zmin': 0, 'zmax': 3}
-    start_base = [0,0,0]
-    goal_base = [6,5,0]
-    obstacles = {i:(env.get_obstacles()[obstacle])._content_dict['geometry'] for i, obstacle in enumerate(env.get_obstacles()) if (env.get_obstacles()[obstacle])._content_dict['type'] == 'sphere'}
-
-    # Initialize and run algorithm
-    rrt_star_base = RRTStar(start_base, goal_base, bounds, obstacles, max_iter=100000)
-    path_points = rrt_star_base.full_run()
-
-    # Extract positionts of the nodes
-    path_points = [rrt_star_base.nodes[node].position for node in path_points]
-
-    # Visualize as test
-    path_points.append([3,2,0])
-    for point in path_points:
-        rounded_points = np.round(point, 2).astype(float)
-        print(f'rounded_points: {rounded_points}')
-        if rounded_points[1] != 0:
-            x = float(rounded_points[0])
-            y = float(rounded_points[1])
-            z = float(rounded_points[2])
-            add_obstacles(env, [x,y,z+2], 0.1)
+    # bounds = {'xmin': -boundary/2, 'xmax': boundary/2, 'ymin': -boundary/2, 'ymax': boundary/2, 'zmin': 0, 'zmax': 3}
+    # start_base = [0,0,0]
+    # goal_base = [6,5,0]
+    # obstacles = {i:(env.get_obstacles()[obstacle])._content_dict['geometry'] for i, obstacle in enumerate(env.get_obstacles()) if (env.get_obstacles()[obstacle])._content_dict['type'] == 'sphere'}
+    #
+    # # Initialize and run algorithm
+    # rrt_star_base = RRTStar(start_base, goal_base, bounds, obstacles, max_iter=100000)
+    # path_points = rrt_star_base.full_run()
+    #
+    # # Extract positionts of the nodes
+    # path_points = [rrt_star_base.nodes[node].position for node in path_points]
+    #
+    # # Visualize as test
+    # path_points.append([3,2,0])
+    # for point in path_points:
+    #     rounded_points = np.round(point, 2).astype(float)
+    #     print(f'rounded_points: {rounded_points}')
+    #     if rounded_points[1] != 0:
+    #         x = float(rounded_points[0])
+    #         y = float(rounded_points[1])
+    #         z = float(rounded_points[2])
+    #         add_obstacles(env, [x,y,z+2], 0.1)
 
     # Initialize action
     action = np.zeros(env.n())
 
     # Perform n steps and follow the computed path
-    base_control = PIDControllerBase(path_points, 0.05, 0., 0.001, 0.01)
-    # goal = [0.266594590604942, -0.0, 1.4062365019198466]
-    # add_obstacles(env, goal, 0.01)
+    # base_control = PIDControllerBase(path_points, 0.05, 0., 0.001, 0.01)
+    goal = [0.266594590604942, -0.0, 1.4062365019198466]
+    #add_obstacles(env, goal, 0.01)
     for _ in range(n_steps):
         # robot_config = get_robot_config(ob)
         # forward_velocity, angular_velocity = base_control.follow_path(robot_config)
@@ -97,29 +97,40 @@ def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
 
         ob, *_ = env.step(action)
 
-        # # Control the arm
-        # end_pos = [0.4825, 0, 1.2]
-        # neutral_joint_pos = [-0.120625, 0, 0.958]
-        # link_length = 0.649864421
-        # x_robot,y_robot,angular = get_robot_config(ob)[0], get_robot_config(ob)[1], get_robot_config(ob)[2]
-        # x_joint = x_robot - neutral_joint_pos[0]*np.cos(angular)
-        # y_joint = y_robot - neutral_joint_pos[0]*np.sin(angular)
-        # joint_pos = [x_joint, y_joint, neutral_joint_pos[2]]
-        # theta = np.round(ob['robot_0']['joint_state']['position'], 1)[4] + 0.9#1.189218407
-        # end_effector_pos = [x_joint + link_length*np.cos(theta), y_joint, (neutral_joint_pos[2] + link_length*np.sin(theta)- 0.2)]
-        # print(f'end_effector_pos: {end_effector_pos}')
-        # error = np.sqrt((end_effector_pos[0] - goal[0])**2 + (end_effector_pos[1] - goal[1])**2 + (end_effector_pos[2] - goal[2])**2)
-        # angular_vel = 0.1*error
-        # print(f'angular_vel: {angular_vel}')
-        # action[0] = -0
+        # Control the arm
+        end_pos = [0.4825, 0, 1.2]
+        add_obstacles(env, end_pos, 0.01)
+        neutral_joint_pos = [-0.120625, 0, 0.958]
+        link_length = 0.649864421
+        x_robot,y_robot,angular = get_robot_config(ob)[0], get_robot_config(ob)[1], get_robot_config(ob)[2]
+
+        # x_joint = x_robot - (link_length - (np.cos(angular)*link_length))
+        # y_joint = y_robot + np.sin(angular) * link_length
+        x_joint = -(link_length - (np.cos(angular)*link_length))
+        y_joint = np.sin(angular) * link_length
+
+        add_obstacles(env, [float(x_joint), float(y_joint), 1.8], 0.01)
+        joint_pos = [x_joint, y_joint, neutral_joint_pos[2]]
+
+        theta = np.round(ob['robot_0']['joint_state']['position'], 1)[4] + 0.9#1.189218407
+        end_effector_pos = [x_joint + link_length*np.cos(theta), y_joint, (neutral_joint_pos[2] + link_length*np.sin(theta)- 0.2)]
+
+        add_obstacles(env, [float(end_effector_pos[0]), float(end_effector_pos[1]), 1.1], 0.01)
+
+        print(f'end_effector_pos: {end_effector_pos}')
+        error = np.sqrt((end_effector_pos[0] - goal[0])**2 + (end_effector_pos[1] - goal[1])**2 + (end_effector_pos[2] - goal[2])**2)
+        angular_vel = 0.1*error
+        print(f'angular_vel: {angular_vel}')
+        action[1] = 2.5
         # action[3] = angular_vel
-        # if i>1:
-        #     x = float(np.round(end_effector_pos[0], 2))
-        #     y = float(np.round(end_effector_pos[1], 2))
-        #     z = float(np.round(end_effector_pos[2], 2))
-        #     add_obstacles(env, [x,y,z], 0.01)
-        # print(f'x_robot: {x_robot}, y_robot: {y_robot}, angular: {angular}')
-        # print(f'x_joint: {x_joint}, y_joint: {y_joint}')
+            # x = float(np.round(end_effector_pos[0], 2))
+            # y = float(np.round(end_effector_pos[1], 2))
+            # z = float(np.round(end_effector_pos[2], 2))
+            # add_obstacles(env, [x,y,z], 0.01)
+        print(f'x_robot: {x_robot}, y_robot: {y_robot}, angular: {angular}')
+        print(f'x_joint: {x_joint}, y_joint: {y_joint}')
+        ob, *_ = env.step(action)
+
     env.close()
 
 
