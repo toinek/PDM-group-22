@@ -44,11 +44,10 @@ class PIDControllerBase:
         if len(self.path) == 0:
             return 0, 0
         target = self.path[0]
+        print(f'target: {target}')
         if not self.angle_reached:
             angular_vel = self.control_angle(robot_ob, target)
             forward_velocity = 0
-            print(f'angular vel: {angular_vel}')
-            print(f'forward vel: {forward_velocity}')
             return forward_velocity, angular_vel
         if not self.target_reached:
             angular_vel = 0

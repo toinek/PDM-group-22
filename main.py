@@ -5,11 +5,11 @@ from urdfenvs.robots.generic_urdf.generic_diff_drive_robot import GenericDiffDri
 from urdfenvs.urdf_common.urdf_env import UrdfEnv
 from mpscenes.obstacles.sphere_obstacle import SphereObstacle
 
-from global_path_planning_3d import RRTStar
+from global_path_planning_3d import RRTStar, illustrate_algorithm_3d
 from local_path_planning import PIDControllerBase
 from local_arm_control import PIDControllerArm
 from add_obstacles import ObstacleAdder
-
+from kinematics import RobotArm
 def add_obstacles(env, pos, radius):
     sphere_obst_dict = {
         "type": "sphere",
@@ -23,7 +23,8 @@ def get_robot_config(ob):
     x = np.round(ob['robot_0']['joint_state']['position'], 1)[0]
     y = np.round(ob['robot_0']['joint_state']['position'], 1)[1]
     angular = np.round(ob['robot_0']['joint_state']['position'], 1)[2]
-    return [x, y, angular]
+    theta = (np.round(ob['robot_0']['joint_state']['position'], 1)[4] + 1.189218407)
+    return x, y, angular, theta
 
 def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
 
@@ -53,156 +54,76 @@ def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
     ob = ob[0]
 
     # Add obstacles to the environment
-    boundary = 16
+    boundary = 12
     obstacle_adder = ObstacleAdder(env)
-    # obstacle_adder.add_spheres()
-    # obstacle_adder.add_walls(boundary)
+    obstacle_adder.add_spheres()
+    obstacle_adder.add_walls(boundary)
 
     # Algorithm inputs
-    # bounds = {'xmin': -boundary/2, 'xmax': boundary/2, 'ymin': -boundary/2, 'ymax': boundary/2, 'zmin': 0, 'zmax': 3}
-    # start_base = [0,0,0]
-    # goal_base = [6,5,0]
-    # obstacles = {i:(env.get_obstacles()[obstacle])._content_dict['geometry'] for i, obstacle in enumerate(env.get_obstacles()) if (env.get_obstacles()[obstacle])._content_dict['type'] == 'sphere'}
-    #
-    # # Initialize and run algorithm
-    # rrt_star_base = RRTStar(start_base, goal_base, bounds, obstacles, max_iter=100000)
-    # path_points = rrt_star_base.full_run()
-    #
-    # # Extract positionts of the nodes
-    # path_points = [rrt_star_base.nodes[node].position for node in path_points]
-    #
-    # # Visualize as test
-    # path_points.append([3,2,0])
-    # for point in path_points:
-    #     rounded_points = np.round(point, 2).astype(float)
-    #     print(f'rounded_points: {rounded_points}')
-    #     if rounded_points[1] != 0:
-    #         x = float(rounded_points[0])
-    #         y = float(rounded_points[1])
-    #         z = float(rounded_points[2])
-    #         add_obstacles(env, [x,y,z+2], 0.1)
+    bounds = {'xmin': -boundary/2, 'xmax': boundary/2, 'ymin': -boundary/2, 'ymax': boundary/2, 'zmin': 0, 'zmax': 0}
+    start_base = [0,0,0]
+    goal_base = [4,5,0.8]
+    obstacles = {i:(env.get_obstacles()[obstacle])._content_dict['geometry'] for i, obstacle in enumerate(env.get_obstacles()) if (env.get_obstacles()[obstacle])._content_dict['type'] == 'sphere'}
+
+    # Initialize and run algorithm
+    rrt_star_base = RRTStar(start_base, goal_base, bounds, obstacles, max_iter=100000)
+    path_points = rrt_star_base.full_run()[::-1]
+    illustrate_algorithm_3d(rrt_star_base)
+
+    # Extract positionts of the nodes
+    path_points = [rrt_star_base.nodes[node].position for node in path_points if node != 0]
+    print(f'path_points: {path_points}')
+
+    # Visualize as test
+    for point in path_points:
+        rounded_points = np.round(point, 2).astype(float)
+        print(f'rounded_points: {rounded_points}')
+        if rounded_points[1] != 0:
+            x = float(rounded_points[0])
+            y = float(rounded_points[1])
+            z = float(rounded_points[2])
+            add_obstacles(env, [x,y,z+2], 0.1)
 
     # Initialize action
     action = np.zeros(env.n())
 
     # Perform n steps and follow the computed path
     link_length = 0.649864421
-    
 
-    path_points = [[-1, -1, 1]]
-    base_control = PIDControllerBase(path_points, 0.5, 0., 0.001, 0.01)
+    base_control = PIDControllerBase(path_points, 0.05, 0., 0.001, 0.01)
 
     arm_pid_controller = PIDControllerArm(1, 0., 0.001, 0.01)
-    #add_obstacles(env, goal, 0.01)
+    arm_kinematics = RobotArm(link_length, [-0.120625, 0, 0.958], arm_pid_controller)
+    previous_error = np.inf
     for _ in range(n_steps):
+        # Obtain robot configuration
         robot_config = get_robot_config(ob)
+        x_robot, y_robot, angular, theta = robot_config
+
+        # Control the base
         forward_velocity, angular_velocity = base_control.follow_path(robot_config)
-        action[0] = forward_velocity*0.5
-        action[1] = angular_velocity
+        action[0] = forward_velocity * 1.5
+        action[1] = angular_velocity * 10
         print(f'forward velocity: {forward_velocity}, angular velocity: {angular_velocity}')
 
-        # Control the arm
-        end_pos = [0.4825, 0, 1.2]
-        
-        # add_obstacles(env, end_pos, 0.01)
-        neutral_joint_pos = [-0.120625, 0, 0.958]
-        
-        # add_obstacles(env, path_points[0], 0.01)
-
-        goal = path_points[0]
-
-        
-        
-        x_robot,y_robot,angular = get_robot_config(ob)[0], get_robot_config(ob)[1], get_robot_config(ob)[2]
-
-        # x_joint = x_robot - (link_length - (np.cos(angular)*link_length))
-        # y_joint = y_robot + np.sin(angular) * link_length
-        x_joint = x_robot - np.cos(angular) * (-neutral_joint_pos[0])
-        y_joint = y_robot - np.sin(angular) * (-neutral_joint_pos[0])
-        z_joint = 0.958 
-
-        # print(f'x_joint: {x_joint}, y_joint: {y_joint}, z_joint: {z_joint}')
-
-
-
-        x_joint = float(np.round(x_joint, 2))
-        y_joint = float(np.round(y_joint, 2))
-        
-        
-        # Calculate the error between the endpoint and goal
-        reached_arm = True
-        target_reached = False
-       
-        # print(f'goal: {goal}')
-        # while the distance between the joint and the goal is equal to the link length, the base should stop moving
-        # print("distance between joint and goal: ", np.sqrt((x_joint - goal[0])**2 + (y_joint - goal[1])**2 + (z_joint - goal[2])**2))
-        if np.sqrt((x_joint - path_points[0][0])**2 + (y_joint - path_points[0][1])**2 + (z_joint - path_points[0][2])**2) <= link_length:
+        # If base target reached, control the arm
+        goal_within_range = arm_kinematics.goal_within_reach(x_robot, y_robot, angular, path_points[0])
+        if goal_within_range:
             action[0] = 0
             action[1] = 0
-            action[2] = 0
-            reached_arm = False
-
-        
-
-        while not reached_arm:
-            previous_error = np.inf
-            theta = (np.round(ob['robot_0']['joint_state']['position'], 1)[4] + 0.9)  # 1.189218407)            end_effector_pos = [(x_joint + link_length*np.sin(theta)), y_joint + link_length*np.sin(theta), (neutral_joint_pos[2] + link_length*np.cos(theta)- 0.2)]
-            arm_length = np.cos(theta) * link_length
-            end_effector_pos = [(x_joint + arm_length * np.cos(angular)),
-                            (y_joint + arm_length * np.sin(angular)),
-                            (neutral_joint_pos[2] + np.sin(theta)*arm_length)]
-            print(f'end effector pos: {end_effector_pos}')
-            if end_effector_pos[2] < goal[2]:
-                error = goal[2] - end_effector_pos[2]
-                print(f'error: {error}')
-                angular_vel = -arm_pid_controller.get_angular_vel(error)
-            else:
-                error = end_effector_pos[2] - goal[2]
-                print(f'error: {error}')
-                angular_vel = arm_pid_controller.get_angular_vel(error)
-            
-            action[3] = angular_vel
-            ob, *_ = env.step(action)
-
-            if error > previous_error:
-                reached_arm = True
-                action[3] = 0
-                ob, *_ = env.step(action)
-                print('reached arm')
-                target_reached = True
-                break
-            elif error < 0.01:
-                reached_arm = True
-                action[3] = 0
-                ob, *_ = env.step(action)
-                print('reached arm')
-                target_reached = True
-                break
-
-            previous_error = error
-            # angular velocity should be negative if the end effector is in the positive goal angle
-            # if end_effector_pos[0] > goal[0]:
-            #     angular_vel = -angular_vel
-            
-
-        if target_reached:
-            print('target reached')
+            base_control.target_reached = True
+        if not arm_kinematics.target_reached and base_control.target_reached:
+            goal = path_points[0]
+            theta = (np.round(ob['robot_0']['joint_state']['position'], 1)[
+                         4] + 1.189218407)
+            q, previous_error = arm_kinematics.follow_arm_path(x_robot, y_robot, angular, theta, goal, previous_error)
+            print(f'q: {q}')
+            action[3] = q
+        if arm_kinematics.target_reached:
+            action[3] = 0
+            arm_kinematics.target_reached = False
+            base_control.target_reached = False
             path_points.pop(0)
-            break
-
-
-        # print(f'error_x: {error_x}, error_y: {error_y}, error_z: {error_z}')
-        # print(f'error: {error}')
-
-
-
-
-        # action[3] = angular_vel
-            # x = float(np.round(end_effector_pos[0], 2))
-            # y = float(np.round(end_effector_pos[1], 2))
-            # z = float(np.round(end_effector_pos[2], 2))
-            # add_obstacles(env, [x,y,z], 0.01)
-    
         ob, *_ = env.step(action)
 
     env.close()

@@ -71,12 +71,12 @@ class RRTStar:
                 nearest_neighbour = node
         return nearest_neighbour
 
-    def check_collision_in_path(self, q1, q2):
+    def check_collision_in_path(self, q1, q2, epsilon=0.5):
         # For explanation see: https://en.wikipedia.org/wiki/Line-sphere_intersection
         # Check for collisions in the path between two configurations q1 and q2
         for obstacle in self.obstacles:
             cx, cy, cz, r = self.obstacles[obstacle]['position'][0], self.obstacles[obstacle]['position'][1], \
-            self.obstacles[obstacle]['position'][2], self.obstacles[obstacle]['radius']
+            self.obstacles[obstacle]['position'][2], self.obstacles[obstacle]['radius'] + epsilon
             x1, y1, z1, x2, y2, z2 = q1[0], q1[1], q1[2], q2[0], q2[1], q2[2]
 
             # Direction vector of the line
