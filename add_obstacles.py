@@ -7,7 +7,7 @@ spawn_rotation = 0.5 * np.pi
 class ObstacleAdder():
     def __init__(self, env):
         self.env = env
-        self.spheres = {1: {'pos': [1.5, 4, 0], 'radius' : 0.2}, 2: {'pos': [1.5, 2, 0], 'radius' : 0.2},
+        self.spheres = {1: {'pos': [1.5, 4, 0], 'radius' : 0.2}, 2: {'pos': [4, 2, 0], 'radius' : 0.2},
                         3: {'pos': [3.5, 2, 0], 'radius' : 0.2}, 4: {'pos': [3.5, 4.5, 0], 'radius' : 0.2}, 5: {'pos': [6, 7, 0], 'radius' : 0.2}}
 
     def add_spheres(self):

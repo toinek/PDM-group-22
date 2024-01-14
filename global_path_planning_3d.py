@@ -21,7 +21,7 @@ class Node:
 
 
 class RRTStar:
-    def __init__(self, start, goal, bounds, obstacles, max_iter=100000):
+    def __init__(self, start, goal, bounds, obstacles, max_iter=100000, two_dim=False):
         self.start = start
         self.goal = goal
         self.bounds = bounds
@@ -30,15 +30,19 @@ class RRTStar:
         self.nodes = {0: Node(0, self.start, 0)}
         self.edges = {}
         self.shortest_path = None
-
+        self.two_dim = two_dim
     def sample_random_config(self):
         # Sample a random configuration q_rand in the state space
         # You can sample from a uniform distribution within the state bounds
         # Return the sampled configuration
         in_collision = True
         while in_collision:
-            q_rand = np.random.uniform([self.bounds['xmin'], self.bounds['ymin'], self.bounds['zmin']],
-                                       [self.bounds['xmax'], self.bounds['ymax'], self.bounds['zmax']])
+            if self.two_dim:
+                q_rand = np.random.uniform([self.bounds['xmin'], self.bounds['ymin'], 0],
+                                           [self.bounds['xmax'], self.bounds['ymax'], 0])
+            else:
+                q_rand = np.random.uniform([self.bounds['xmin'], self.bounds['ymin'], self.bounds['zmin']],
+                                           [self.bounds['xmax'], self.bounds['ymax'], self.bounds['zmax']])
             in_collision = self.check_sample_in_obstacle(q_rand, 0.5)
         return q_rand
 
