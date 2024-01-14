@@ -45,7 +45,7 @@ class RRTStar:
     def check_goal_reached(self, q):
         # Check if the goal has been reached
         # Return True if goal has been reached, False otherwise
-        if euclidean_distance(q, self.goal) < 0.5:
+        if euclidean_distance(q, self.goal) < 0.2:
             return True
         return False
 
@@ -76,7 +76,7 @@ class RRTStar:
         # Check for collisions in the path between two configurations q1 and q2
         for obstacle in self.obstacles:
             cx, cy, cz, r = self.obstacles[obstacle]['position'][0], self.obstacles[obstacle]['position'][1], \
-            self.obstacles[obstacle]['position'][2], self.obstacles[obstacle]['radius'] + epsilon
+            self.obstacles[obstacle]['position'][2], self.obstacles[obstacle]['radius']  + epsilon
             x1, y1, z1, x2, y2, z2 = q1[0], q1[1], q1[2], q2[0], q2[1], q2[2]
 
             # Direction vector of the line
@@ -98,6 +98,7 @@ class RRTStar:
 
                 # Check if the intersections are within the line segment
                 if 0 <= d1 <= 1 or 0 <= d2 <= 1:
+                    print("Collision detected")
                     return True
 
         return False

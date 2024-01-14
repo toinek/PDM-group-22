@@ -54,15 +54,15 @@ def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
     ob = ob[0]
 
     # Add obstacles to the environment
-    boundary = 12
+    boundary = 16
     obstacle_adder = ObstacleAdder(env)
     obstacle_adder.add_spheres()
     obstacle_adder.add_walls(boundary)
 
     # Algorithm inputs
-    bounds = {'xmin': -boundary/2, 'xmax': boundary/2, 'ymin': -boundary/2, 'ymax': boundary/2, 'zmin': 0, 'zmax': 0}
+    bounds = {'xmin': -0, 'xmax': boundary/2, 'ymin': -0, 'ymax': boundary/2, 'zmin': 0, 'zmax': 0}
     start_base = [0,0,0]
-    goal_base = [4,5,0.8]
+    goal_base = [7,5,0]
     obstacles = {i:(env.get_obstacles()[obstacle])._content_dict['geometry'] for i, obstacle in enumerate(env.get_obstacles()) if (env.get_obstacles()[obstacle])._content_dict['type'] == 'sphere'}
 
     # Initialize and run algorithm
@@ -104,15 +104,16 @@ def run_albert(n_steps=100000, render=False, goal=True, obstacles=True):
         forward_velocity, angular_velocity = base_control.follow_path(robot_config)
         action[0] = forward_velocity * 1.5
         action[1] = angular_velocity * 10
-        print(f'forward velocity: {forward_velocity}, angular velocity: {angular_velocity}')
+        #print(f'forward velocity: {forward_velocity}, angular velocity: {angular_velocity}')
 
-        # If base target reached, control the arm
+        # If the base reached the goal, control the arm
         goal_within_range = arm_kinematics.goal_within_reach(x_robot, y_robot, angular, path_points[0])
+        print(path_points)
         if goal_within_range:
             action[0] = 0
             action[1] = 0
             base_control.target_reached = True
-        if not arm_kinematics.target_reached and base_control.target_reached:
+        if not arm_kinematics.target_reached and base_control.target_reached and len(path_points) == 1:
             goal = path_points[0]
             theta = (np.round(ob['robot_0']['joint_state']['position'], 1)[
                          4] + 1.189218407)

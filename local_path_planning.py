@@ -35,7 +35,8 @@ class PIDControllerBase:
         x, y, robot_angle = robot_ob[0], robot_ob[1], robot_ob[2]
         target_error = np.sqrt((target[0] - x) ** 2 + (target[1] - y) ** 2)
         forward_velocity = self.update(target_error+0.2)
-        if target_error < 0.01:
+        print(f'target error: {target_error}')
+        if target_error < 0.1:
             print('target reached')
             self.target_reached = True
         return forward_velocity
@@ -44,7 +45,6 @@ class PIDControllerBase:
         if len(self.path) == 0:
             return 0, 0
         target = self.path[0]
-        print(f'target: {target}')
         if not self.angle_reached:
             angular_vel = self.control_angle(robot_ob, target)
             forward_velocity = 0
