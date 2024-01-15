@@ -22,3 +22,17 @@ This readme explains how to install and run a RRT* planning algorithm for a mobi
     ```bash
     pip install -r requirements.txt
     ```
+
+## Running the Main Code
+
+To run the main code from the terminal, you can use the following command:
+
+```bash
+python main.py --render --hard --rrt_star
+'''
+### Command-Line Options:
+--render: Enable visualization during the execution of the algorithm.
+
+--hard: Set this flag to make the goal position harder. If omitted, the default is an easier goal position.
+
+--rrt_star: Use the RRT* algorithm for global path planning. If omitted, the default is to use the algorithm without RRT*.
