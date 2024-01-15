@@ -1,6 +1,12 @@
 # PDM-group-22
 This repository was made for the group assignment of the RO47005 Planning & Decision Making course at the TU Delft. In this project a RRT and RRT* algorithm have been compared as motion planners for a mobile manipulator. 
 
+Contributors:
+- Lars Bosma, 4967321
+- Mees van der Lecq, 4887409
+- Daan Poutsma, 4956184
+- Toine Koelmans, 4806751
+
 ## Getting started
 This readme explains how to install and run the planning algorithm in the created environment
 This file will contain the following contents:
