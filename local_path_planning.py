@@ -21,27 +21,21 @@ class PIDControllerBase:
         return self.kp * error + self.ki * self.error_sum + self.kd * error_diff
 
     def control_angle(self, robot_ob, target):
-        angle_reached = False
         x, y, robot_angle = robot_ob[0], robot_ob[1], robot_ob[2]
         desired_angle = np.arctan2(target[1] - y, target[0] - x)
         angle_error = desired_angle - robot_angle
-        angular_vel = 0.4 #self.update(angle_error)
-        if angle_error < 0:
-            angular_vel = -angular_vel
-        print(f'angle error: {angle_error}')
+        angular_vel = self.update(angle_error) #0.4
         if abs(angle_error) < 0.1:
-            print("angle reached")
+            print("base angle reached")
             self.angle_reached = True
         return angular_vel
 
     def control_velocity(self, robot_ob, target):
-        target_reached = False
         x, y, robot_angle = robot_ob[0], robot_ob[1], robot_ob[2]
         target_error = np.sqrt((target[0] - x) ** 2 + (target[1] - y) ** 2)
-        forward_velocity = 0.5 #self.update(target_error+0.2)
-        print(f'target error: {target_error}')
+        forward_velocity = self.update(target_error) #0.5
         if target_error < 0.5:
-            print('target reached')
+            print('base target reached')
             self.target_reached = True
         return forward_velocity
 
@@ -54,7 +48,6 @@ class PIDControllerBase:
             # Interpolate between start_node and end_node
             for t in np.linspace(0, 1, 5):
                 interpolated_point = (1 - t) * np.array(start_node) + t * np.array(end_node)
-                print(f'interpolated_point: {interpolated_point}')
                 interpolated_points.append(interpolated_point)
         self.path = interpolated_points
 

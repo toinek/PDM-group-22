@@ -7,6 +7,7 @@ class RobotArm:
         self.joint_offset = joint_offset
         self.pid_controller = pid_controller
         self.target_reached = False
+
     def get_joint_pos(self, x_robot, y_robot, angular):
         x_joint = x_robot - np.cos(angular) * -self.joint_offset[0]
         y_joint = y_robot - np.sin(angular) * -self.joint_offset[0]
@@ -30,24 +31,20 @@ class RobotArm:
     def follow_arm_path(self, x_robot, y_robot, angular, theta, goal, previous_error):
         self.target_reached = False
         end_effector_pos = self.forward_kinematics(x_robot, y_robot, angular, theta)
-        # error = np.sqrt((goal[0] - end_effector_pos[0])**2 + (goal[1] - end_effector_pos[1])**2 + (goal[2] - end_effector_pos[2])**2)
         if end_effector_pos[2] < goal[2]:
             error = goal[2] - end_effector_pos[2]
-            print(f'error: {error}')
             q = -self.pid_controller.get_angular_vel(error)
         else:
             error = end_effector_pos[2] - goal[2]
-            print(f'error: {error}')
             q = self.pid_controller.get_angular_vel(error)
         if error > previous_error:
             self.target_reached = True
             q = 0
-            print('reached arm')
+            print('reached arm location')
         if error < 0.05:
             self.target_reached = True
             q = 0
-            print('reached arm')
-        print(f'previous error: {previous_error}')
+            print('reached arm location')
         previous_error = error
         return q, previous_error
 

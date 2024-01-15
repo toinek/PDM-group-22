@@ -7,17 +7,22 @@ spawn_rotation = 0.5 * np.pi
 class ObstacleAdder():
     def __init__(self, env):
         self.env = env
-        self.spheres = {1: {'pos': [1.5, 4, 0], 'radius' : 0.2}, 2: {'pos': [4, 2, 0], 'radius' : 0.2},
-                        3: {'pos': [3.5, 2, 0], 'radius' : 0.2}, 4: {'pos': [3.5, 4.5, 0], 'radius' : 0.2}, 5: {'pos': [6, 7, 0], 'radius' : 0.2}}
+        self.spheres = {1: {'pos': [1.5, 1.5, 0], 'radius' : 0.2}, 2: {'pos': [3, 2, 0], 'radius' : 0.2},
+                        3: {'pos': [4, 2, 0], 'radius' : 0.2}, 4: {'pos': [3.5, 4.5, 0], 'radius' : 0.2}, 5: {'pos': [6, 7, 0], 'radius' : 0.2},
+                         7: {'pos': [1, 7, 0], 'radius' : 0.2}, 8: {'pos': [7, 1, 0], 'radius' : 0.2}}
 
-    def add_spheres(self):
+    def add_spheres(self, hard):
         for sphere in self.spheres:
+            if not hard:
+                if sphere > 3:
+                    break
             pos = self.spheres[sphere]['pos']
             radius = self.spheres[sphere]['radius']
             sphere_obst_dict = {
                 "type": "sphere",
                 'movable': False,
                 "geometry": {"position": pos, "radius": radius},
+                "rgba":  [1.0, 0.0, 0.0, 1.0],
             }
             sphere_obst = SphereObstacle(name=f'obstacle_{pos[0]}_{pos[1]}_{pos[2]}', content_dict=sphere_obst_dict)
             self.env.add_obstacle(sphere_obst)

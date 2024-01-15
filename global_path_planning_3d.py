@@ -21,16 +21,19 @@ class Node:
 
 
 class RRTStar:
-    def __init__(self, start, goal, bounds, obstacles, max_iter=100000, two_dim=False):
+    def __init__(self, start, goal, bounds, obstacles, epsilon, max_iter=100000, two_dim=False, star=True):
         self.start = start
         self.goal = goal
         self.bounds = bounds
         self.obstacles = obstacles
+        self.epsilon = epsilon
         self.max_iter = max_iter
         self.nodes = {0: Node(0, self.start, 0)}
         self.edges = {}
         self.shortest_path = None
         self.two_dim = two_dim
+        self.star = star
+
     def sample_random_config(self):
         # Sample a random configuration q_rand in the state space
         # You can sample from a uniform distribution within the state bounds
@@ -43,7 +46,7 @@ class RRTStar:
             else:
                 q_rand = np.random.uniform([self.bounds['xmin'], self.bounds['ymin'], self.bounds['zmin']],
                                            [self.bounds['xmax'], self.bounds['ymax'], self.bounds['zmax']])
-            in_collision = self.check_sample_in_obstacle(q_rand, 0.5)
+            in_collision = self.check_sample_in_obstacle(q_rand)
         return q_rand
 
     def check_goal_reached(self, q):
@@ -53,13 +56,13 @@ class RRTStar:
             return True
         return False
 
-    def check_sample_in_obstacle(self, q_rand, epsilon):
+    def check_sample_in_obstacle(self, q_rand):
         for obstacle in self.obstacles:
             obstacle_position_3d = (self.obstacles[obstacle]['position'][0], self.obstacles[obstacle]['position'][1],
                                     self.obstacles[obstacle]['position'][2])
             distance = euclidean_distance(q_rand, obstacle_position_3d)
-            if distance < self.obstacles[obstacle]['radius'] + epsilon:
-                print("Sampled within obstacle")
+            if distance < self.obstacles[obstacle]['radius'] + self.epsilon:
+                #print("Sampled within obstacle")
                 return True
         return False
 
@@ -75,12 +78,12 @@ class RRTStar:
                 nearest_neighbour = node
         return nearest_neighbour
 
-    def check_collision_in_path(self, q1, q2, epsilon=0.5):
+    def check_collision_in_path(self, q1, q2):
         # For explanation see: https://en.wikipedia.org/wiki/Line-sphere_intersection
         # Check for collisions in the path between two configurations q1 and q2
         for obstacle in self.obstacles:
             cx, cy, cz, r = self.obstacles[obstacle]['position'][0], self.obstacles[obstacle]['position'][1], \
-            self.obstacles[obstacle]['position'][2], self.obstacles[obstacle]['radius']  + epsilon
+            self.obstacles[obstacle]['position'][2], self.obstacles[obstacle]['radius']  + self.epsilon
             x1, y1, z1, x2, y2, z2 = q1[0], q1[1], q1[2], q2[0], q2[1], q2[2]
 
             # Direction vector of the line
@@ -102,7 +105,6 @@ class RRTStar:
 
                 # Check if the intersections are within the line segment
                 if 0 <= d1 <= 1 or 0 <= d2 <= 1:
-                    print("Collision detected")
                     return True
 
         return False
@@ -119,6 +121,14 @@ class RRTStar:
         collision = self.check_collision_in_path(q_near.position, q_rand)
         if not collision:
             self.nodes[len(self.nodes)] = Node(len(self.nodes), q_rand, q_near.number)
+        if not self.star:
+            # Update the edges
+            all_nodes = list(self.nodes.keys())[::-1]
+            for node in all_nodes:
+                all_nodes.remove(node)
+                if self.nodes[node].parent != node:
+                    if [self.nodes[node].parent, node] not in self.edges.values():
+                        self.edges[len(self.edges)] = [self.nodes[node].parent, node]
         return collision
 
     def rewire(self, new_node_id):
@@ -169,26 +179,28 @@ class RRTStar:
         q_rand = self.sample_random_config()
         q_near = self.nearest_neighbour(q_rand)
         collision = self.extend(self.nodes[q_near], q_rand)
-        if not collision:
+        if not collision and self.star == True:
             self.rewire(len(self.nodes)-1)
         return q_rand
     def full_run(self):
         # Perform the RRT algorithm for max_iter iterations
         # Return the shortest path found
         for i in range(self.max_iter):
+            #print(self.nodes)
             q_new = self.step()
             if self.check_goal_reached(q_new):
                 self.shortest_path = self.compute_path(0, len(self.nodes)-1)
-                return self.shortest_path
-        return None
+                cost_shortest_path = self.path_cost(self.shortest_path)
+                return self.shortest_path, cost_shortest_path
 
 def illustrate_algorithm_3d(rrt):
     fig = go.Figure()
 
-    for node in rrt.nodes:
+    for node in list(rrt.nodes.keys())[1:-1]:
         x, y, z = rrt.nodes[node].position
-        fig.add_trace(go.Scatter3d(x=[x], y=[y], z=[z], mode='markers+text', text=[str(node)], textposition='bottom center'))
-
+        fig.add_trace(go.Scatter3d(x=[x], y=[y], z=[z], mode='markers+text', marker=dict(size=1), textposition='bottom center'))
+    fig.add_trace(go.Scatter3d(x=[rrt.start[0]], y=[rrt.start[1]], z=[rrt.start[2]], mode='markers+text', marker=dict(size=25), text=['start'], textposition='top center'))
+    fig.add_trace(go.Scatter3d(x=[rrt.goal[0]], y=[rrt.goal[1]], z=[rrt.goal[2]], mode='markers+text', marker=dict(size=25), text=['goal'], textposition='top center'))
     for edge in rrt.edges:
         node_1 = rrt.nodes[rrt.edges[edge][0]]
         node_2 = rrt.nodes[rrt.edges[edge][1]]
