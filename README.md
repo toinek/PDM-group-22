@@ -3,11 +3,10 @@
 ## Getting started
 This readme explains how to install and run a RRT* planning algorithm for a mobile manipulator. Created for the course Planning & Decision Making by group 22
 
-## Dependencies
-Python 3.x
-Required Python packages can be installed using:
-Copy code
-pip install gymnasium numpy matplotlib urdfpy
+## Pre-requisites
++ Python >= 3.8
++ pip3
++ git
 
 ## Setup
 
