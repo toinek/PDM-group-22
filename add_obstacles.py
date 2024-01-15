@@ -1,6 +1,5 @@
 from mpscenes.obstacles.sphere_obstacle import SphereObstacle
 from mpscenes.obstacles.box_obstacle import BoxObstacle
-import numpy as np
 
 class ObstacleAdder():
     def __init__(self, env):

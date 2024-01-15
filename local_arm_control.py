@@ -1,4 +1,3 @@
-import numpy as np
 class PIDControllerArm():
 
     def __init__(self, kp, ki, kd, dt):
