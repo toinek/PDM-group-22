@@ -24,12 +24,12 @@ This readme explains how to install and run a RRT* planning algorithm for a mobi
     ```
 
 ## Running the Main Code
-
 To run the main code from the terminal, you can use the following command:
 
 ```bash
 python main.py --render --hard --rrt_star
-'''
+```
+
 ### Command-Line Options:
 --render: Enable visualization during the execution of the algorithm.
 
