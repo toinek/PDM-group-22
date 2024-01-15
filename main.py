@@ -138,7 +138,6 @@ def run_albert(rrt_star, start_base, hard, n_steps=100000, render=True):
 
 
 def run_from_command_line(args):
-    #start_base = [float(val) for val in args.start_base.split(',')]
     render = args.render
     hard = args.hard
     rrt_star = args.rrt_star
