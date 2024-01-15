@@ -1,7 +1,8 @@
 import warnings
+import argparse
+import time
 import gymnasium as gym
 import numpy as np
-import time
 
 from urdfenvs.robots.generic_urdf.generic_diff_drive_robot import GenericDiffDriveRobot
 from urdfenvs.urdf_common.urdf_env import UrdfEnv
@@ -136,12 +137,37 @@ def run_albert(rrt_star, start_base, hard, n_steps=100000, render=True):
     env.close()
 
 
-if __name__ == "__main__":
-    show_warnings = False
-    warning_flag = "default" if show_warnings else "ignore"
+def run_from_command_line(args):
+    #start_base = [float(val) for val in args.start_base.split(',')]
+    render = args.render
+    hard = args.hard
+    rrt_star = args.rrt_star
+    start_base = [0, 0, 0]
     with warnings.catch_warnings():
-        start_base = [0, 0, 0]
-        warnings.filterwarnings(warning_flag)
-        run_albert(start_base=start_base, render=True, hard=True, rrt_star=True)
+        run_albert(start_base=start_base, render=render, hard=hard, rrt_star=rrt_star)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Robotic Motion Planning and Decision Making')
+
+    # Add command-line arguments
+    parser.add_argument('--render', action='store_true', help='Enable visualization')
+    parser.add_argument('--hard', action='store_true', help='Set to True for a harder goal position')
+    parser.add_argument('--rrt_star', action='store_true', help='Use RRT* algorithm for global path planning')
+
+    args = parser.parse_args()
+
+    run_from_command_line(args)
+
+
+
+
+# if __name__ == "__main__":
+#     show_warnings = False
+#     warning_flag = "default" if show_warnings else "ignore"
+#     with warnings.catch_warnings():
+#         start_base = [0, 0, 0]
+#         warnings.filterwarnings(warning_flag)
+#         run_albert(start_base=start_base, render=True, hard=True, rrt_star=True)
 
 
