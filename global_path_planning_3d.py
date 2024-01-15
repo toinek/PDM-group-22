@@ -223,7 +223,5 @@ if __name__ == "__main__":
     rrt_star = RRTStar(start=[0, 0, 0], goal=[5, 5, 3], bounds={'xmin': -8, 'xmax': 8, 'ymin': -8, 'ymax': 5.5, 'zmin': 0, 'zmax': 5}, obstacles=obstacles)
     shortest_path = rrt_star.full_run()
     print(f'Shortest path: {shortest_path}')
-    for node in shortest_path:
-        print(rrt_star.nodes[node])
     illustrate_algorithm_3d(rrt_star)
 
