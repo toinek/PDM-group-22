@@ -1,7 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Line3D, Patch3D
 import plotly.graph_objects as go
 
 def euclidean_distance(q1, q2):

@@ -2,8 +2,6 @@ from mpscenes.obstacles.sphere_obstacle import SphereObstacle
 from mpscenes.obstacles.box_obstacle import BoxObstacle
 import numpy as np
 
-spawn_rotation = 0.5 * np.pi
-
 class ObstacleAdder():
     def __init__(self, env):
         self.env = env
