@@ -12,16 +12,16 @@ This readme explains how to install and run a RRT* planning algorithm for a mobi
 
 1. **Clone the repository:**
 
-    ```bash
-    git clone git@github.com:toinek/PDM-group-22.git
-    cd PDM-group-22
-    ```
+```bash
+git clone git@github.com:toinek/PDM-group-22.git
+cd PDM-group-22
+```
 
 2. **Install additional dependencies:**
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+```bash
+pip install -r requirements.txt
+```
 
 ## Running the Main Code
 To run the main code from the terminal, you can use the following command:
@@ -35,4 +35,4 @@ python main.py --render --hard --rrt_star
 
 --hard: Set this flag to make the goal position harder. If omitted, the default is an easier goal position.
 
---rrt_star: Use the RRT* algorithm for global path planning. If omitted, the default is to use the algorithm without RRT*.
+--rrt_star: Use the RRT* algorithm for global path planning. If omitted, the default is to use the RRT algorithm.
