@@ -41,7 +41,7 @@ def get_robot_config(ob):
     return x, y, angular, theta
 
 def run_albert(rrt_star, start_base, hard, n_steps=100000, render=True):
-
+    #test comment
     # Create robot and environment
     robots = [
         GenericDiffDriveRobot(
